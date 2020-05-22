@@ -32,6 +32,9 @@ class Search extends Watch {
     }
 
     public function search_results($query){
+        
+        $this->logger->debug('Searching For '.$query);
+
         $response = $this->request($this->domain."/search.html?keyword=$query");
         $content = $this->parse_html($response);
 

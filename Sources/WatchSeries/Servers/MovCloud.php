@@ -25,12 +25,15 @@ class MovCloud extends Request {
 
         foreach($content->data->sources as $video){
 
+            $url = $video->file;
+
             $source = new Data();
             $source->quality = '';
-            $source->url = $video->file;
+            $source->url = $url;
             $source->server_name = 'movcloud';
 
             $sources[] = $source;
+
         }
 
         return $sources;

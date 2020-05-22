@@ -5,6 +5,7 @@ namespace Sources\WatchSeries\Servers;
 use Data\Data;
 use Shared\Request;
 use Exception;
+use Shared\Validator;
 
 class Vidcloud extends Request {
 
@@ -24,16 +25,30 @@ class Vidcloud extends Request {
 
         $sources = [];
 
-        foreach($content->source as $video){
-            $source = new Data();
-            $source->quality = '';
-            $source->url = $video->file;
-            $source->server_name = 'vidcloud';
+        if($content && property_exists($content,'source')){
 
-            $sources[] = $source;
+            foreach($content->source as $video){
+                $url = $video->file;
+                
+                preg_match('/m3u8|st3x.cdnfile.info/i',$url,$matches);
+    
+                if(!$matches && $this->validate_url($url)){
+    
+                    $source = new Data();
+                    $source->quality = '';
+                    $source->url = $url;
+                    $source->server_name = 'vidcloud';
+        
+                    $sources[] = $source;
+    
+                }
+    
+            }
+            
         }
 
-        return array_unique($sources);
+
+        return $sources;
     }
 }
 

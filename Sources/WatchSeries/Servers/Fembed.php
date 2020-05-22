@@ -25,12 +25,16 @@ class Fembed extends Request {
 
         if ($content->success){
             foreach($content->data as $video){
+
+                $url = $video->file;
+                
                 $source = new Data();
                 $source->quality = $video->label;
-                $source->url = $video->file;
+                $source->url = $url;
                 $source->server_name = 'fembed';
 
                 $sources[] = $source;
+
             }
         }
 
