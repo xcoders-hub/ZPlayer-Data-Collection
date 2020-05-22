@@ -70,10 +70,16 @@ class Watch extends Request {
     }
 
     public function fetch_movie($url){
-
+        
         $response = $this->request($url);
         $content = $this->parse_html($response);
-        $movie_url = $this->domain . $content->filter('a.view_more')->eq(0)->attr('href');
+
+        try {
+            $movie_url = $this->domain . $content->filter('a.view_more')->eq(0)->attr('href');
+        } catch(Exception $e){
+            return false;
+        }
+        
 
         return $this->fetch_sources($movie_url);
     }
@@ -90,28 +96,40 @@ class Watch extends Request {
 
         $this->logger->debug('Fetching Sources For');
 
-        // $content->filter('.vid_info a')->each(function(Crawler $node, $i){
+        $content->filter('.vid_info a')->each(function(Crawler $node, $i){
 
-        //     global $episodes;
+            global $episodes;
 
-        //     $episode_number = str_replace(['Episode ',':'],'',$node->text());
-        //     $link = $this->domain . $node->attr('href');
+            $episode_text = $node->text();
+            preg_match('/episode/i',$episode_text,$matches);
 
-        //     $this->logger->debug('Fetching Sources For '.$episode_number);
-        //     $sources = $this->fetch_sources( $link );
-        //     $this->logger->debug('Found '.count( $sources ).' Sources');
+            if($matches){
 
-        //     $episode = new Data();
-        //     $episode->episode_number = $episode_number;
-        //     $episode->sources = $sources;
+                $episode_number = str_replace(['Episode ',':'],'',$episode_text);
+                $link = $this->domain . $node->attr('href');
+    
+                $this->logger->debug('Fetching Sources For '.$episode_number);
+                $sources = $this->fetch_sources( $link );
+                $this->logger->debug('Found '.count( $sources ).' Sources');
+    
+                $episode = new Data();
+                $episode->episode_number = $episode_number;
+                $episode->sources = $sources;
+    
+                $episodes[] = $episode;
 
-        //     $episodes[] = $episode;
+            } else {
+                $this->logger->error('None Episode Type Found: '.$episode_text);
+            }
 
-        // });
 
-        die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/the-flash-season-6-episode-1') ) );
+        });
+
+        die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/pulp-fiction-scd-episode-1') ) );
+
         return $episodes;
     }
+    
 }
 
 ?>
