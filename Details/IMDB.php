@@ -10,14 +10,14 @@ use Data\Data;
 // Fetches Information for any given show/Movie using IMDB
 class IMDB extends Request {
 
-    function overview($name,$type,$year){
+    function overview($name,$type,$year=false){
         //Get IMDB Details
 
         // $name = 'star wars';
         // $year = 2008;
         // $type = 'movie';
 
-        $name = preg_replace('/\?/','',strtolower($name));
+        $name = preg_replace('/\?|\//','',strtolower($name));
 
         preg_match('/^.*?(\w)/',$name,$matches);
         if(!$matches){
@@ -253,7 +253,11 @@ class IMDB extends Request {
     
                             $response = $this->request($season_url);
                             $content = $this->parse_html($response);
-    
+                            
+                            if(!$content){
+                                break;
+                            }
+
                             $episodes_list = [];
     
                             $content->filter('.list_item')->each(function(Crawler $node, $i) {
@@ -263,7 +267,7 @@ class IMDB extends Request {
     
                                 try {
     
-                                    $episode->episode_number = $node->filter('[itemprop="episodeNumber"]')->attr('content');
+                                    $episode->episode_number = trim(preg_replace('/\(|\)|,/','',$node->filter('[itemprop="episodeNumber"]')->attr('content')));
                                     $episode->name = trim($node->filter('[itemprop="name"]')->text());
                                     $episode->description = trim($node->filter('[itemprop="description"]')->text());
                                     $episode->released = trim($node->filter('.airdate')->text());
