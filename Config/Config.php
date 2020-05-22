@@ -8,7 +8,8 @@
 
         'new' => [
             'movies' => '/movies/new/details',
-            'series' => '/series/new/details'
+            'series' => '/series/new/details',
+            'episode' => '/series/new/episode'
         ],
 
         'source' => [
@@ -18,23 +19,28 @@
                 'movies' => '/sources/list/movies'
             ],
 
-            'insert' => '/sources/insert'
-        ]
+            'insert' => '/sources/insert',
+
+            'status' => '/sources/status'
+        ],
+
+        'unique' => '/unique',
+
     ],
 
     'data_page' => [
 
-        'domain' => 'https://www2.f2movies.to',
+        'url' => 'https://www6.watchmovie.movie',
 
-        'movies' => 'https://www2.f2movies.to/movie',
-        'series' => 'https://www2.f2movies.to/tv-show',
+        'series' => '/watch-series',
+        'movies' => '/letters',
 
     ],
 
     'retry' => [
         'request' => [
             'wait' => 60,
-            'times' => 5
+            'times' => 10
         ]
     ]
 );
