@@ -7,23 +7,27 @@ use Symfony\Component\DomCrawler\Crawler;
 use \Symfony\Component\HttpClient\HttpClient;
 
 // Used for sending GET/POST Requests. Retrying And Logging
-class Request {
+class Request extends Validator {
+ 
 
     public function request($url, $method="GET",$headers=[],$data=[]){
 
         $client = HttpClient::create(['verify_peer' => false]);
+        
         $times_retried = 0;
 
         if(count($data) == 0){
-            $request_data = [ 'headers' => $headers ];
+            $request_data = [ 'headers' => $headers,'timeout' => 1000];
         } else {
-            $request_data = [ 'headers' => $headers,'json' => $data];
+            $request_data = [ 'headers' => $headers,'json' => $data, 'timeout' => 1000];
         }
 
         $request_send_success = false;
 
         $wait = $this->config->retry->request->wait;
         $retry =  $this->config->retry->request->times;
+        
+        $ignore_response = false;
 
         while($times_retried < $retry ){
             
@@ -49,12 +53,26 @@ class Request {
                     if($statusCode == 422) {
                         $request_send_success = true;
                         break;
-                    } elseif($statusCode == 404){
-                        throw new Exception('404 Page Not Found');
+                    } elseif($statusCode == 404 || $statusCode == 524){
+                        preg_match('/imdb|vidcloud/i',$url,$matches);
+                        if($matches){
+                            $this->logger->error('Page Doesn\'t Exists');
+                            $content = false;
+                            $ignore_response = true;
+                            break;
+                        } else {
+                            throw new Exception('404 Page Not Found');
+                        }
+                        
                     } elseif($statusCode == 429){
                         throw new Exception('Too Many Requests. Slowing Down');
-                    } elseif($statusCode == 500){
-                        // $this->logger->critical('Something Seriously Wrong With Endpoint.');
+                    } elseif($statusCode == 400){
+                        $this->logger->error('Page Doesn\'t Exists');
+                        $content = false;
+                        $ignore_response = true;
+                        break;
+                    } elseif($statusCode == 500 ){
+
                         if($content->message){
                             $this->logger->critical('Error Message: '.$content->message);
                         }
@@ -77,7 +95,7 @@ class Request {
         }
 
         
-        if($request_send_success){
+        if($request_send_success || $ignore_response){
             return $content;
         } else {
             $this->logger->error('--- Failed To Send Request. ---');
@@ -87,6 +105,32 @@ class Request {
             throw new Exception('Failed To Send Request: '.$url);
         }
 
+    }
+    
+    public function page_exists($url,$method='GET'){
+
+        $this->logger->debug('Checking Existence Of: '.$url);
+
+        if(!isset($url)){
+            $this->logger->error('No URL Found');
+            return false;
+        }
+        
+        if(!$this->validate_url($url)){
+            $this->logger->error('Invalid URL '.$url);
+            return false;
+        }
+            
+        try {
+            $client = HttpClient::create(['verify_peer' => false]);
+            $response = $client->request($method, $url);
+            $content = $response->getContent();
+        } catch(Exception $e) {
+            $this->logger->error('Page Doesn\'t Exist: '.$url);
+            return false;
+        }
+
+        return true;
     }
 
     public function parse_html($content){
