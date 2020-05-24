@@ -54,11 +54,19 @@ class Watch extends Request {
                 } elseif(isset($storage)) {
                     $video_id = $matches[1];
                     
-                    $video_sources = $storage->video_locations($video_id);
+                    $video_sources = [];
 
-                    if($video_sources){
-                        $sources[] = $video_sources;
+                    try {
+                        $video_sources = $storage->video_locations($video_id);
+                    } catch(Exception $e){
+                        $this->logger->error('Source Errors: '. $e->getMessage());    
                     }
+                   
+
+                    if($video_sources && count($video_sources) > 0){
+                        $sources = array_merge($sources,$video_sources);
+                    }
+                    
                     
                 }
 
@@ -74,14 +82,18 @@ class Watch extends Request {
         $response = $this->request($url);
         $content = $this->parse_html($response);
 
+        $movie = new Data();
+
         try {
             $movie_url = $this->domain . $content->filter('a.view_more')->eq(0)->attr('href');
         } catch(Exception $e){
             return false;
         }
         
+        $movie->sources = $this->fetch_sources($movie_url);
+        $movie->content_url = $movie_url;
 
-        return $this->fetch_sources($movie_url);
+        return $movie;
     }
 
     public function fetch_series($url){
@@ -115,6 +127,7 @@ class Watch extends Request {
                 $episode = new Data();
                 $episode->episode_number = $episode_number;
                 $episode->sources = $sources;
+                $episode->content_url = $link;
     
                 $episodes[] = $episode;
 
@@ -125,7 +138,7 @@ class Watch extends Request {
 
         });
 
-        die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/pulp-fiction-scd-episode-1') ) );
+        // die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/pulp-fiction-scd-episode-1') ) );
 
         return $episodes;
     }
