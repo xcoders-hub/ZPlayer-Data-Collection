@@ -12,7 +12,7 @@
             'episode' => '/series/new/episode'
         ],
 
-        'source' => [
+        'sources' => [
 
             'list' => [
                 'series' => '/sources/list/series',
@@ -21,7 +21,11 @@
 
             'insert' => '/sources/insert',
 
-            'status' => '/sources/status'
+            'status' => '/sources/status',
+
+            'update' => '/sources/update',
+
+            'delete' => '/sources/delete',
         ],
 
         'unique' => '/unique',
