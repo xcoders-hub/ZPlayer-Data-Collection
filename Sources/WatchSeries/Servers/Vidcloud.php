@@ -30,7 +30,7 @@ class Vidcloud extends Request {
             foreach($content->source as $video){
                 $url = $video->file;
                 
-                preg_match('/m3u8|st3x.cdnfile.info/i',$url,$matches);
+                preg_match('/m3u8|st3.cdnfile/i',$url,$matches);
     
                 if(!$matches && $this->validate_url($url)){
     
