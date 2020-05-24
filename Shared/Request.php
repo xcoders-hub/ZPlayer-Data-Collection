@@ -10,27 +10,28 @@ use \Symfony\Component\HttpClient\HttpClient;
 class Request extends Validator {
  
 
-    public function request($url, $method="GET",$headers=[],$data=[]){
+    public function request($url, $method="GET",$headers=[],$data=[],$timeout=2000){
 
         $client = HttpClient::create(['verify_peer' => false]);
         
         $times_retried = 0;
 
         if(count($data) == 0){
-            $request_data = [ 'headers' => $headers,'timeout' => 1000];
+            $request_data = [ 'headers' => $headers,'timeout' => $timeout];
         } else {
-            $request_data = [ 'headers' => $headers,'json' => $data, 'timeout' => 1000];
+            $request_data = [ 'headers' => $headers,'json' => $data, 'timeout' => $timeout];
         }
 
         $request_send_success = false;
 
-        $wait = $this->config->retry->request->wait;
         $retry =  $this->config->retry->request->times;
         
         $ignore_response = false;
 
         while($times_retried < $retry ){
             
+            $wait = $this->config->retry->request->wait;
+
             try {
 
                 $response = $client->request($method, $url,$request_data);
@@ -65,6 +66,7 @@ class Request extends Validator {
                         }
                         
                     } elseif($statusCode == 429){
+                        // $wait = 1;
                         throw new Exception('Too Many Requests. Slowing Down');
                     } elseif($statusCode == 400){
                         $this->logger->error('Page Doesn\'t Exists');
@@ -73,7 +75,7 @@ class Request extends Validator {
                         break;
                     } elseif($statusCode == 500 ){
 
-                        if($content->message){
+                        if(property_exists($content,'message')){
                             $this->logger->critical('Error Message: '.$content->message);
                         }
     
