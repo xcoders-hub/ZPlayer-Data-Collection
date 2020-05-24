@@ -1,0 +1,239 @@
+<?php
+
+namespace Sources\WatchSeries;
+
+use Data\Data;
+use Shared\API;
+use Sources\WatchSeries\Search;
+
+class Shared extends Search {
+
+    public $config,$logger;
+
+    function __construct($config,$logger)
+    {
+        $this->config = $config;
+        $this->logger = $logger;
+
+        $this->api = new API($logger);
+    }
+
+    public function details($content_type){
+        $url = $this->config->api->url . $this->config->api->sources->list->$content_type;
+
+        $response = $this->request($url);
+        $content = $this->parse_json($response);
+
+        return $content;
+    }
+
+    public function send_sources($content,$delete_old_sources=false){
+        
+        $url = $this->config->api->url;
+
+        if($delete_old_sources){
+            $url .= $this->config->api->sources->delete;
+        } else {
+            $url .= $this->config->api->sources->insert;
+        }
+
+        $response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => $content]);
+        $content = $this->parse_json($response);
+
+        if( property_exists($content,'errors') ){
+            $this->api->errors($content->errors);
+        }
+
+    }
+
+    public function parse_results($results,$content_type){
+
+        if($results){
+            $correct_results = $results[$content_type];
+
+            $item = $correct_results[0];
+
+            if($content_type == 'series'){
+                $sources = $this->fetch_series($item['url']);
+            } else {
+                $sources = $this->fetch_movie($item['url']);
+            }
+
+           return $sources;
+
+        } else {
+            return false;
+        }
+
+    }
+
+    public function process_series($details,$content_type){
+
+        foreach($details->data as $data){
+            $name = html_entity_decode($data->name,ENT_QUOTES);
+            $id = $data->id;
+            $imdb_url = $data->imdb_url;
+
+            $this->logger->debug("------------------------- Series $name($id) Start -------------------------");
+            $this->logger->debug('IMDB URL: '.$imdb_url);
+
+            foreach($data->seasons as $season){
+
+                $season_number = $season->season_number;
+
+                $search_string =  $name . ' Season ' .$season_number;
+
+                $this->logger->debug("----------- $search_string Start -----------");
+
+                $this->logger->debug("Finding $search_string");
+                $results = $this->search_results($search_string);
+
+                $video_episodes = $this->parse_results($results,$content_type);
+
+                $encoded_data = json_encode($video_episodes);
+
+                $this->logger->debug("Saving List");
+
+                file_put_contents(__DIR__.'/../../Downloads/Sources/Episode-List.json',$encoded_data);
+
+                if(!$video_episodes){
+                    $this->logger->debug("No Sources Found. New Show Possibly.");
+                    break;
+                }
+
+                $this->logger->debug("Sending Sources To Endpoint");
+
+                foreach($video_episodes as $video_episode){
+
+                    $episode_number = (int)$video_episode->episode_number;
+                    $source_list = $video_episode->sources;
+                    $content_url = $video_episode->content_url;
+                    
+                    if(property_exists($season->episodes,$episode_number)){
+                        $content_id = $season->episodes->{$episode_number}->id;
+                    }
+
+                    $new_source = new Data();
+
+                    $this->logger->debug("Uploading Source For Season $season_number, Episode $episode_number ($content_id)");
+
+                    $new_source->content_url = $content_url;
+                    $new_source->content_type = 'series';
+
+                    if(!isset($content_id)){
+                        $new_source->name = 'Episode '.$episode_number;
+                        $new_source->episode_number = (int)$episode_number;
+                        $new_source->season_id = $season->id;
+
+                        $this->logger->notice("New Episode Found: Season $season_number, Episode $episode_number");
+                        $content_id = $this->new_episode_found($new_source);
+
+                        $new_source->content_id = $new_source->id = $content_id;
+
+                        $season->episodes->{ $new_source->episode_number } = $new_source;
+                    } else {
+                        $new_source->content_id = $content_id;
+                    }   
+
+                    $new_source->sources = $source_list;
+                    
+                    $this->send_sources($new_source);
+                   
+                }
+
+                $this->logger->debug("----------------- $search_string Complete ---------------------");
+               
+            }
+
+            $this->logger->debug("------------------------- Series $name($id) Complete -------------------------");
+
+            $this->update_source_status($data->id);
+        }
+
+    }
+
+    public function process_movies($details){
+
+        foreach($details->data as $data){
+            $old_name = html_entity_decode($data->name,ENT_QUOTES); 
+
+            $name = preg_replace('/\s*\(\d+\)\s*/','',$old_name);
+
+            $this->logger->debug("-------------------------  $old_name Start ------------------------- ");
+
+            $this->logger->debug("Finding $name");
+            $results = $this->search_results($name);
+            
+            if(key_exists('movies',$results)){
+                
+                $movie = $this->parse_results($results,'movies');
+
+                $encoded_data = json_encode($movie);
+
+                $this->logger->debug("Saving List");
+                
+                file_put_contents(__DIR__.'/../../Downloads/Sources/Movie-List.json',$encoded_data);
+
+                if(!$movie){
+                    $this->logger->debug("No Sources Found. New Movie Possibly.");
+
+                }else {
+
+                    $this->logger->debug("Sending Sources To Endpoint");
+
+                    $new_source = new Data();
+        
+                    $new_source->content_id = $data->id;
+                    $new_source->content_type = 'movies';
+                    $new_source->content_url = 
+        
+                    $this->logger->debug("Uploading Source For $name");
+        
+                    $new_source->content_url = $movie->content_url;
+
+                    $new_source->sources = $movie->sources;
+                    
+                    $this->send_sources($new_source);
+                    
+                }
+
+            } else {
+                $this->logger->debug("No Movies Watching Description Found");
+            }
+
+            $this->logger->debug("-------------------------  $old_name Complete ------------------------- ");
+
+            $this->update_source_status($data->id);
+        }
+    }
+
+    public function new_episode_found($content){
+        $url = $this->config->api->url . $this->config->api->new->episode;
+
+        $response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => $content]);
+        $content = $this->parse_json($response);
+
+        if(property_exists($content,'errors')){
+            $this->api->errors($content->errors);
+        } else {
+            return $content->data->content_id;
+        }
+    }
+
+    public function update_source_status($content_id){
+        
+        $url = $this->config->api->url . $this->config->api->sources->status;
+
+        $this->logger->debug('Updating Content Souce Status');
+
+        $response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => [ 'content_id' => $content_id ] ]);
+        $content = $this->parse_json($response);
+
+        if(property_exists($content,'errors')){
+            $this->api->errors($content->errors);
+        }
+
+    }
+}
+
+?>
