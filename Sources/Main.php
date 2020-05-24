@@ -3,6 +3,7 @@
 namespace Sources;
 
 use Sources\WatchSeries\Main;
+use Sources\WatchSeries\Server;
 
 require_once __DIR__.'/../vendor/autoload.php';
 require_once __DIR__.'/../Shared/Logger.php';
@@ -13,18 +14,28 @@ if(count($argv) < 3){
 } else {
 
     $site = strtolower($argv[1]);
-    $type = strtolower($argv[2]);
+    $option = strtolower($argv[2]);
 
     if($site == 'watchseries'){
-        $content_page = new WatchSeries\Main($Config,$logger);
-    } elseif(strtolower($argv[1]) == 'series'){
         
+        if($option == 'series' || $option == 'movies'){
+            $content_page = new WatchSeries\Main($Config,$logger);
+            $content_page->search($option);
+        } elseif($option == 'update'){
+            $update_content = new WatchSeries\Update($Config,$logger);
+            $update_content->sources();
+        } elseif($option == 'listen'){
+            $server = new Server($Config,$logger);
+            $server->listen();
+        } else {
+            die('Source Location Required');
+        }
+
     } else {
         die('Source Location Required');
     }
 
 
-    $sources = $content_page->search($type);
 
 }
 
