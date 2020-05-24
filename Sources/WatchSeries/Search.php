@@ -33,6 +33,8 @@ class Search extends Watch {
 
     public function search_results($query){
         
+        $query = str_replace('&','and',$query);
+        
         $this->logger->debug('Searching For '.$query);
 
         $response = $this->request($this->domain."/search.html?keyword=$query");
