@@ -35,9 +35,9 @@ class NewContent extends IMDB {
         $this->new_movies($series_url,'movies');
     }
 
-    public function find_last_details($type){
+    public function find_last_details($content_type){
 
-        $api_url =  $this->api_page->new->content->$type;
+        $api_url =  $this->api_page->new->content->$content_type;
 
         $response = $this->request($api_url);
         $content = $this->parse_json($response);
@@ -120,13 +120,8 @@ class NewContent extends IMDB {
                 } else {
 
                     $details->url = $url;
-
-                    $response = $this->send_details($details,'series');
+                    $this->send_details($details,'series');
     
-                    if($response->error){
-                        throw new Exception('Error Sending Details: '.$response->error);
-                    }
-
                 }
 
                 $this->logger->debug("--------------- Series Complete: $title - $url ---------------");
@@ -158,7 +153,7 @@ class NewContent extends IMDB {
 
         if($last_details){
 
-            if($last_details->errors){
+            if( property_exists($last_details,'errors') ){
                 $this->shared_api->errors($last_details->errors);
             } else {
                 $page = $last_details->last_page ?? 1;
@@ -190,7 +185,7 @@ class NewContent extends IMDB {
         
                 if($content->filter('tr a')->count() == 0){
                     $page = 0;
-                    break;
+                    break;  
                 }
 
                 $content->filter('tr a')->each(function(Crawler $node, $i) use($history,$page,$content){
@@ -220,11 +215,7 @@ class NewContent extends IMDB {
     
                         $details->url = $url;
     
-                        $response = $this->send_details($details,'movies');
-        
-                        if($response->error){
-                            throw new Exception('Error Sending Details: '.$response->error);
-                        }
+                        $this->send_details($details,'movies');
     
                     }
     
@@ -237,25 +228,30 @@ class NewContent extends IMDB {
                 $page++;
             }
 
+            if($index == ( sizeof($character_list) - 1 )){
+                $index = 0;
+            } else {
+                $index++;
+            }
             
-            $index++;
+            
         }
 
 
     }
 
-    private function send_details($details,$type){
+    private function send_details($details,$content_type){
 
         file_put_contents(__DIR__.'/../Downloads/Details/Details_Request.json',json_encode($details));
 
-        $url = $this->api->url . $this->api->new->$type;
+        $url = $this->api->url . $this->api->new->$content_type;
         $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => $details]);
         $response = $this->parse_json($api_response);
 
         file_put_contents(__DIR__.'/../Downloads/Details/Details_Response.json',json_encode($api_response));
 
-        if($response->errors){
-            $this->shared_api->errors($response->errors);
+        if(property_exists($response,'errors')){
+            return $this->shared_api->errors($response->errors);
         }
 
     }

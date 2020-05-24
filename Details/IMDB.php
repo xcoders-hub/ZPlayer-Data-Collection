@@ -10,12 +10,12 @@ use Data\Data;
 // Fetches Information for any given show/Movie using IMDB
 class IMDB extends Request {
 
-    function overview($name,$type,$year=false){
+    function overview($name,$content_type,$year=false){
         //Get IMDB Details
 
         // $name = 'star wars';
         // $year = 2008;
-        // $type = 'movie';
+        // $content_type = 'movie';
 
         $name = preg_replace('/\?|\//','',strtolower($name));
 
@@ -48,7 +48,7 @@ class IMDB extends Request {
 
         $show_id = $content->d[0]->id;
 
-        if($type == 'series'){
+        if($content_type == 'series'){
 
             if( ( !property_exists($content->d[0],'q')  || !$this->contains_tv($content->d[0]->q) ) ){
 
@@ -137,9 +137,9 @@ class IMDB extends Request {
                         global $genres;
         
                         try {
-                            $type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
+                            $content_type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
         
-                            if($type == 'genres'){
+                            if($content_type == 'genres'){
         
                                 $genres = $node->filter('a')->each(function(Crawler $node, $i){
                                     return $node->text();
@@ -217,7 +217,7 @@ class IMDB extends Request {
 
                 $this->logger->debug('IMDB Rating: '.$rating);
 
-                if($type == 'series'){
+                if($content_type == 'series'){
 
                     $series_details->tv_series = true;
 
@@ -249,7 +249,7 @@ class IMDB extends Request {
                             $season_url = "https://www.imdb.com/title/$show_id/episodes/_ajax?season=$season_number";
     
                             $season->season_number = $season_number;
-                            $season->url = $season_url;
+                            $season->imdb_url = $season_url;
     
                             $response = $this->request($season_url);
                             $content = $this->parse_html($response);
@@ -268,7 +268,7 @@ class IMDB extends Request {
                                 try {
     
                                     $episode->episode_number = trim(preg_replace('/\(|\)|,/','',$node->filter('[itemprop="episodeNumber"]')->attr('content')));
-                                    $episode->name = trim($node->filter('[itemprop="name"]')->text());
+                                    $episode->name = trim($node->filter('[itemprop="name"]')->attr('title'));
                                     $episode->description = trim($node->filter('[itemprop="description"]')->text());
                                     $episode->released = trim($node->filter('.airdate')->text());
                                     $episode->rating = trim($node->filter('.ipl-rating-star__rating')->text());
