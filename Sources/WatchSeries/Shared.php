@@ -18,8 +18,8 @@ class Shared extends Search {
         $this->api = new API($logger);
     }
 
-    public function details($content_type){
-        $url = $this->config->api->url . $this->config->api->sources->list->$content_type;
+    public function details($path){
+        $url = $this->config->api->url . $path;
 
         $response = $this->request($url);
         $content = $this->parse_json($response);
@@ -50,13 +50,19 @@ class Shared extends Search {
 
         if($results){
             $correct_results = $results[$content_type];
-
+            
             $item = $correct_results[0];
 
-            if($content_type == 'series'){
-                $sources = $this->fetch_series($item['url']);
+            if($item && key_exists('url',$item) && $item['url']){
+
+                if($content_type == 'series'){
+                    $sources = $this->fetch_series($item['url']);
+                } else {
+                    $sources = $this->fetch_movie($item['url']);
+                }
+
             } else {
-                $sources = $this->fetch_movie($item['url']);
+                return false;
             }
 
            return $sources;
@@ -103,43 +109,7 @@ class Shared extends Search {
 
                 $this->logger->debug("Sending Sources To Endpoint");
 
-                foreach($video_episodes as $video_episode){
-
-                    $episode_number = (int)$video_episode->episode_number;
-                    $source_list = $video_episode->sources;
-                    $content_url = $video_episode->content_url;
-                    
-                    if(property_exists($season->episodes,$episode_number)){
-                        $content_id = $season->episodes->{$episode_number}->id;
-                    }
-
-                    $new_source = new Data();
-
-                    $this->logger->debug("Uploading Source For Season $season_number, Episode $episode_number ($content_id)");
-
-                    $new_source->content_url = $content_url;
-                    $new_source->content_type = 'series';
-
-                    if(!isset($content_id)){
-                        $new_source->name = 'Episode '.$episode_number;
-                        $new_source->episode_number = (int)$episode_number;
-                        $new_source->season_id = $season->id;
-
-                        $this->logger->notice("New Episode Found: Season $season_number, Episode $episode_number");
-                        $content_id = $this->new_episode_found($new_source);
-
-                        $new_source->content_id = $new_source->id = $content_id;
-
-                        $season->episodes->{ $new_source->episode_number } = $new_source;
-                    } else {
-                        $new_source->content_id = $content_id;
-                    }   
-
-                    $new_source->sources = $source_list;
-                    
-                    $this->send_sources($new_source);
-                   
-                }
+                $this->upload_season_sources($season,$video_episodes);
 
                 $this->logger->debug("----------------- $search_string Complete ---------------------");
                
@@ -155,11 +125,10 @@ class Shared extends Search {
     public function process_movies($details){
 
         foreach($details->data as $data){
-            $old_name = html_entity_decode($data->name,ENT_QUOTES); 
 
-            $name = preg_replace('/\s*\(\d+\)\s*/','',$old_name);
+            $name = $this->clean_content_name($data->name);
 
-            $this->logger->debug("-------------------------  $old_name Start ------------------------- ");
+            $this->logger->debug("-------------------------  $name Start ------------------------- ");
 
             $this->logger->debug("Finding $name");
             $results = $this->search_results($name);
@@ -185,23 +154,24 @@ class Shared extends Search {
         
                     $new_source->content_id = $data->id;
                     $new_source->content_type = 'movies';
-                    $new_source->content_url = 
         
                     $this->logger->debug("Uploading Source For $name");
-        
-                    $new_source->content_url = $movie->content_url;
+                    
+                    if($movie->content_url){
+                        $new_source->content_url = $movie->content_url;
 
-                    $new_source->sources = $movie->sources;
-                    
-                    $this->send_sources($new_source);
-                    
+                        $new_source->sources = $movie->sources;
+                        
+                        $this->send_sources($new_source);
+                    }
+
                 }
 
             } else {
                 $this->logger->debug("No Movies Watching Description Found");
             }
 
-            $this->logger->debug("-------------------------  $old_name Complete ------------------------- ");
+            $this->logger->debug("-------------------------  $name Complete ------------------------- ");
 
             $this->update_source_status($data->id);
         }
@@ -234,6 +204,75 @@ class Shared extends Search {
         }
 
     }
+
+    public function clean_content_name($name){
+        $name = html_entity_decode($name,ENT_QUOTES); 
+        $name = preg_replace('/\s*\(\d+\)\s*/','',$name);
+        return $name;
+    }
+
+
+    public function upload_season_sources($season,$video_episodes){
+
+        $season_number = $season->season_number;
+
+        foreach($video_episodes as $video_episode){
+
+            $episode_number = (int)$video_episode->episode_number;
+            $source_list = $video_episode->sources;
+            $content_url = $video_episode->content_url;
+
+            $this->logger->debug("Uploading Source For Season $season_number, Episode $episode_number");
+
+            if($source_list && count($source_list) == 0){
+                $this->logger->debug('No Sources Found');
+                continue;
+            }
+            
+            if(property_exists($season->episodes,$episode_number)){
+                $content_id = $season->episodes->{$episode_number}->id;
+            }
+
+
+            $new_source = new Data();
+
+            $new_source->content_url = $content_url;
+            $new_source->content_type = 'series';
+
+            if(!isset($content_id)){
+                $new_source->name = 'Episode '.$episode_number;
+                $new_source->episode_number = (int)$episode_number;
+                $new_source->season_id = $season->id;
+
+                $this->logger->notice("New Episode Found: Season $season_number, Episode $episode_number");
+                $content_id = $this->new_episode_found($new_source);
+
+                $new_source->content_id = $new_source->id = $content_id;
+
+                $season->episodes->{ $new_source->episode_number } = $new_source;
+            } else {
+                $new_source->content_id = $content_id;
+            }   
+
+            $new_source->sources = $source_list;
+        
+            if($new_source->sources){
+                $this->send_sources($new_source);
+            }
+           
+        }
+
+    }
+
+    public function new_series_sources($series_id){
+
+        $path = $this->config->api->details->series . "/$series_id";
+
+        $details = $this->details($path);
+
+        $this->process_series($details,'series');
+    }
+
 }
 
 ?>
