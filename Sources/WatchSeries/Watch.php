@@ -19,22 +19,40 @@ use Sources\WatchSeries\Servers\Vidcloud;
 class Watch extends Request {
 
     public $domain = "https://watchmovie.movie";
+
+    public $config,$logger;
+
+    function __construct($config,$logger)
+    {
+        $this->config = $config;
+        $this->logger = $logger;
+    }
+
+
     //Fetch All Sources For Link
     public function fetch_sources($url){
-        global $sources;
+        global $sources,$history,$vidcloud_id_history;
 
         $response = $this->request($url);
         $content = $this->parse_html($response);
 
         $sources = [];
+        $history = [];
+        $vidcloud_id_history = [];
 
         $content->filter('a[data-video]')->each(function(Crawler $node, $i){
-            global $sources;
+            global $sources,$history,$vidcloud_id_history;
 
             $url = $node->attr('data-video');
             $url = preg_replace('/^\/\//',"https://",$url);
             preg_match('/^https:\/\/(?:www.)?(\w+)/',$url,$matches);
             
+            if(key_exists($url,$history)){
+               return;
+            }
+
+            $history[$url] = 1;
+
             if($matches && $matches != 'hydrax'){
                 $name = strtolower($matches[1]);
 
@@ -42,6 +60,20 @@ class Watch extends Request {
                     $storage = new MovCloud($this->config,$this->logger);
                     preg_match('/\/embed\/([\w\d\_\-\+]+)\?*/',$url,$matches);
                 } elseif($name == 'vidcloud9'){
+
+                    preg_match('/\?id=(.+)/',$url,$matches);
+
+                    if($matches){
+                        $vidcloud_id = $matches[1];
+                        
+                        if(!key_exists($vidcloud_id,$vidcloud_id_history)){
+                            $vidcloud_id_history[$vidcloud_id] = 1;
+                        } else {
+                            return;
+                        }
+
+                    }
+
                     $storage = new Vidcloud($this->config,$this->logger);
                     preg_match('/\.php\?(.+)/',$url,$matches);
                 } elseif($name == 'fembed' || $name == 'gcloud'){
@@ -54,6 +86,8 @@ class Watch extends Request {
                 } elseif(isset($storage)) {
                     $video_id = $matches[1];
                     
+                    $this->logger->debug('Found Video Link: '.$url);
+
                     $video_sources = [];
 
                     try {
@@ -67,13 +101,13 @@ class Watch extends Request {
                         $sources = array_merge($sources,$video_sources);
                     }
                     
-                    
+
                 }
 
             }
 
         });
-
+        
         return $sources;
     }
 
@@ -112,37 +146,44 @@ class Watch extends Request {
 
             global $episodes;
 
-            $episode_text = $node->text();
-            preg_match('/episode/i',$episode_text,$matches);
+            $episode = $this->fetch_episode($node);
 
-            if($matches){
-
-                $episode_number = str_replace(['Episode ',':'],'',$episode_text);
-                $link = $this->domain . $node->attr('href');
-    
-                $this->logger->debug('Fetching Sources For '.$episode_number);
-                $sources = $this->fetch_sources( $link );
-                $this->logger->debug('Found '.count( $sources ).' Sources');
-    
-                $episode = new Data();
-                $episode->episode_number = $episode_number;
-                $episode->sources = $sources;
-                $episode->content_url = $link;
-    
-                $episodes[] = $episode;
-
-            } else {
-                $this->logger->error('None Episode Type Found: '.$episode_text);
-            }
-
+            $episodes[] = $episode;
 
         });
 
-        // die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/pulp-fiction-scd-episode-1') ) );
+        // die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/stargirl-season-1-2020-episode-2') ) );
 
         return $episodes;
     }
     
+    public function fetch_episode($node){
+
+        $episode_text = $node->text();
+        preg_match('/episode/i',$episode_text,$matches);
+
+        $episode = new Data();
+
+        if($matches){
+
+            $episode_number = str_replace(['Episode ',':'],'',$episode_text);
+            $link = $this->domain . $node->attr('href');
+
+            $this->logger->debug('Fetching Sources For Episode '.$episode_number);
+            $sources = $this->fetch_sources( $link );
+            $this->logger->debug('Found '.count( $sources ).' Sources');
+
+            
+            $episode->episode_number = $episode_number;
+            $episode->sources = $sources;
+            $episode->content_url = $link;
+
+        } else {
+            $this->logger->error('None Episode Type Found: '.$episode_text);
+        }
+
+        return $episode;
+    }
 }
 
 ?>
