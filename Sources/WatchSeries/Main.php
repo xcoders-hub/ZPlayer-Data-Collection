@@ -25,7 +25,9 @@ class Main extends Shared {
 
         while(true){
             
-            $details = $this->details($content_type);
+            $path = $this->config->api->sources->list->$content_type;
+
+            $details = $this->details($path);
 
             if($details->data){
 
