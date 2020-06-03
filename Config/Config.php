@@ -28,7 +28,17 @@
             'delete' => '/sources/delete',
         ],
 
+        'details' => [
+            'series' => '/contents/series'
+        ],
+
+        'similar' => '/contents/similar',
+
         'unique' => '/unique',
+
+        'update' => [
+            'series' => '/contents/series/update'
+        ]
 
     ],
 
