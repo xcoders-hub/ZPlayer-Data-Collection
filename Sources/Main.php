@@ -24,9 +24,6 @@ if(count($argv) < 3){
         } elseif($option == 'update'){
             $update_content = new WatchSeries\Update($Config,$logger);
             $update_content->sources();
-        } elseif($option == 'listen'){
-            $server = new Server($Config,$logger);
-            $server->listen();
         } else {
             die('Source Location Required');
         }
