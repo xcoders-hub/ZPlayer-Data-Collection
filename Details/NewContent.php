@@ -45,6 +45,15 @@ class NewContent extends IMDB {
         return array('last_page' => $content->last_page,'series_id' => $content->series_id );
     }
 
+    public function similar_list(){
+        $api_url =   $this->config->api->url . $this->config->api->similar;
+
+        $response = $this->request($api_url);
+        $content = $this->parse_json($response);
+
+        return $content->data;
+    }
+
     private function new_series($url){
         //Check if show already exists in database.
 
@@ -79,13 +88,17 @@ class NewContent extends IMDB {
     
             $this->logger->debug("Page $page: $url?page=$page");
 
+            if( $content->filter('li.video-block')->count() == 0){
+                $page = 0;
+                break;  
+            }
+
             $content->filter('li.video-block')->each(function(Crawler $node, $i) use($history,$page){
                 global $last_url;
 
                 $season_title = $node->filter('.home_video_title')->eq(0)->text();
                 $season_url =  $this->data_page->url . $node->filter('a.view_more')->eq(0)->attr('href');
-                $url = preg_replace('/-season-\d+-episode-\d+/','',$season_url);
-
+                $url = preg_replace('/-*[^seasons]*-*[^seasons]*-episode-\d+/','',$season_url);
 
                 $history->update('series',['last_page' => $page,'last_url'=> $url]);
 
@@ -115,14 +128,32 @@ class NewContent extends IMDB {
 
                 $details = $this->overview($title,'series');
                 
-                if(!$details){
+                if(!$details || !property_exists($details,'name')){
                     return;
                 } else {
-
                     $details->url = $url;
                     $this->send_details($details,'series');
-    
-                }
+                }   
+
+                // $this->logger->debug("-------- Similar Search Start: $title -------");
+                
+
+                // foreach($details->related as $name){
+                //     $this->logger->debug("--------------- Similar Start: $name ---------------");
+        
+                //     $details = $this->overview($name,'series');
+                    
+                //     if(!$details || !property_exists($details,'name')){
+                //         return;
+                //     } else {
+                //         $this->send_details($details,'series');
+                //     }
+        
+                //     $this->logger->debug("--------------- Similar Complete: $name ---------------");
+                // }
+
+                // $this->logger->debug("-------- Similar Search Complete: $title -------");
+
 
                 $this->logger->debug("--------------- Series Complete: $title - $url ---------------");
 
@@ -256,6 +287,34 @@ class NewContent extends IMDB {
 
     }
 
+    private function similar_complete($content_id){
+        $url =   $this->config->api->url . $this->config->api->similar;
+
+        if(!$content_id){
+            throw new Exception('No ID Found: '.$content_id);
+        }
+
+        $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => ['content_id' => $content_id] ]);
+        $response = $this->parse_json($api_response);
+
+        if(property_exists($response,'errors')){
+            return $this->shared_api->errors($response->errors);
+        }
+
+    }
+
+    private function update_details($details,$content_type){
+
+        $url = $this->api->url . $this->api->update->$content_type;
+        $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => $details]);
+        $response = $this->parse_json($api_response);
+
+        if(property_exists($response,'errors')){
+            return $this->shared_api->errors($response->errors);
+        }
+
+    }
+
     //If this content is new. Send request to api
     public function new_content($site_url){
         $url = $this->config->api->url . $this->config->api->unique;
@@ -284,6 +343,111 @@ class NewContent extends IMDB {
             }
         } catch(Exception $e){
             return false;
+        }
+
+    }
+
+    public function update(){
+
+        //Increase Waiting And Retry Times, Not Important Here
+        $this->config->retry->request->wait = 180;
+        $this->config->retry->request->times = 20;
+
+        //Reach to endpoint and get list of all contents older than 1 week
+        $history = new History($this->config, $this->logger);
+
+        while(true){
+
+            $old_contents = $history->old('series');
+
+            if(!$old_contents){
+                $this->logger->debug("No Content To Update");
+                break;
+            }
+
+            foreach($old_contents as $content){
+    
+                $show_url = $content->imdb_url;
+                $name = $content->name;
+    
+                $this->logger->debug("--------------- Updating $name Start ---------------");
+                
+                $series_details = new Data();
+                $series_details->url = $content->url;
+                $series_details->imdb_url = $show_url;
+                $series_details->old_name = htmlspecialchars($name);
+                $series_details->content_type = $content->content_type;
+                $series_details->show_id = $this->url_id($show_url);
+        
+                $this->process_page($series_details);
+                    
+                if($series_details){
+                    $this->update_details($series_details,'series');
+                }
+    
+                $this->logger->debug("--------------- Updating $name Complete ---------------");
+                
+            }
+
+        }
+
+
+
+    }
+    
+    public function similar(){
+
+        $this->config->retry->request->times = 1;
+
+        while(true){
+            $content_list = $this->similar_list();
+
+            if(count($content_list) == 0){
+                $this->logger->debug('Similar Complete');
+                break;
+            }
+
+            foreach($content_list as $details){
+                
+                try {
+
+                    $this->logger->debug('Finding Similar For '.$details->name);
+
+                    $success_status = $this->process_page($details);
+
+                    if($success_status){
+
+                        $content_id = $details->id;
+                        $content_type = $details->content_type;
+
+                        foreach($details->related as $id => $name){
+                
+                            $this->logger->debug("--------------- Similar Start: $name ---------------");
+                            
+                            $details = $this->overview($name,$content_type,false,$id);
+                        
+                            if(!$details || !property_exists($details,'name')){
+                                continue;
+                            } else {
+                                $this->send_details($details,$content_type);
+                            }
+
+                            $this->logger->debug("--------------- Similar Complete: $name ---------------");
+        
+                        }
+                        
+                        $this->logger->debug('Updating Similar Field: '.$content_id);
+        
+                        $this->similar_complete($content_id);
+
+                    }
+
+                } catch(Exception $e){
+                    $this->logger->error("Similar Error: ".$e->getMessage());
+                }
+
+            }
+
         }
 
     }

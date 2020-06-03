@@ -9,22 +9,20 @@ if(count($argv) < 2){
     die('New Content Type Required: Movie/Series');
 } else {
     
-    if(strtolower($argv[1]) == 'movies'){
-        $tv_series = false;
-        $logger->debug('Finding New Movies');
-    } elseif(strtolower($argv[1]) == 'series'){
-        $tv_series = true;
-        $logger->debug('Finding New Series');
-    } else {
-        die('Type Required: Movie or Series');
-    }
-
     $content = new NewContent($Config,$logger);
 
-    if($tv_series){
-        $content->series();
-    } else {
+    if(strtolower($argv[1]) == 'movies'){
+        $logger->debug('Finding New Movies');
         $content->movies();
+    } elseif(strtolower($argv[1]) == 'series'){
+        $logger->debug('Finding New Series');
+        $content->series();
+    } elseif(strtolower($argv[1]) == 'update'){
+        $content->update();
+    } elseif(strtolower($argv[1] == 'similar')){
+        $content->similar();
+    } else {
+        die('Type Required: Movie or Series');
     }
 
 }

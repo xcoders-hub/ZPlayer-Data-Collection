@@ -28,5 +28,12 @@ class History extends Request{
         return $content;
     }
 
+    public function old($content_type){
+        $url = $this->config->api->url . "/contents/$content_type/old";
+        $response = $this->request($url,'GET',['x-requested-with' => 'XMLHttpRequest']);
+        $content = $this->parse_json($response);
+        return $content->data;
+    }
+
 }
 ?>
