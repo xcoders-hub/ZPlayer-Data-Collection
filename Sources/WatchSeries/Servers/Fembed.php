@@ -31,7 +31,7 @@ class Fembed extends Request {
                 $source = new Data();
                 $source->quality = $video->label;
                 $source->url = $url;
-                $source->server_name = 'fembed';
+                $source->server_name = 'Fembed';
 
                 $sources[] = $source;
 

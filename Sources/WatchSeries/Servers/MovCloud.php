@@ -30,7 +30,7 @@ class MovCloud extends Request {
             $source = new Data();
             $source->quality = '';
             $source->url = $url;
-            $source->server_name = 'movcloud';
+            $source->server_name = 'Movcloud';
 
             $sources[] = $source;
 
