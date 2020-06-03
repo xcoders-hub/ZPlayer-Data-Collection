@@ -10,12 +10,83 @@ use Data\Data;
 // Fetches Information for any given show/Movie using IMDB
 class IMDB extends Request {
 
-    function overview($name,$content_type,$year=false){
-        //Get IMDB Details
+    public function overview($name,$content_type,$year=false,$show_id=false){
+        
+        if(!$show_id){
+            $show_id = $this->get_show_id($name,$content_type,$year);
+        } else {
+            $this->logger->debug('Show Id Passed In: '.$show_id);
+        }
 
-        // $name = 'star wars';
-        // $year = 2008;
-        // $content_type = 'movie';
+        if(!$show_id){
+            $this->logger->error('No Matching IMDB Page Found');
+            return false;
+        }
+
+        $show_url = "https://www.imdb.com/title/$show_id";
+
+        $series_details = new Data();
+        $series_details->imdb_url = $show_url;
+        $series_details->old_name = htmlspecialchars($name);
+        $series_details->content_type = $content_type;
+        $series_details->show_id = $show_id;
+
+        $success = $this->process_page($series_details);
+        
+        if($success){
+            return $series_details;
+        } else {
+            return false;
+        }
+
+    }
+
+    public function process_page($series_details){
+
+        $this->logger->debug('IMDB URL: '.$series_details->imdb_url);
+
+        try {
+            $response = $this->request($series_details->imdb_url);
+            $content = $this->parse_html($response);
+        } catch(Exception $e){
+            $this->logger->error('Failed To Find IMDB Page. Skipping');
+            return false;
+        }
+
+
+        file_put_contents(__DIR__.'/../Downloads/Details/imdb_page.html',$content->html());
+
+        $content_found = false;
+
+        for($i =0;$i < $this->config->retry->request->times;$i++){
+
+            try {
+                
+                $this->details($content,$series_details);
+
+                $content_found = true;
+                
+                break;
+
+            } catch(Exception $e){
+                $this->logger->error('Content Not Found. Reloading Page: '.$e->getMessage());
+
+                $response = $this->request($series_details->imdb_url);
+                $content = $this->parse_html($response);
+                
+                sleep( $this->config->retry->request->wait );
+            }
+            
+        }
+
+        if(!$content_found){
+            throw new Exception('Failed To Find Details');
+        }
+
+        return true;
+    }
+
+    public function get_show_id($name,$content_type,$year=false){
 
         $name = preg_replace('/\?|\//','',strtolower($name));
 
@@ -92,232 +163,223 @@ class IMDB extends Request {
 
         }
 
+        return $show_id;
 
-        $show_url = "https://www.imdb.com/title/$show_id";
-        // $show_url = "https://www.imdb.com/title/tt6136778";
+    }
+
+    public function details($content,$series_details){
+
+        $series_name = trim($content->filter('h1')->eq(0)->text());
         
-        $this->logger->debug('IMDB URL: '.$show_url);
+        global $genres;
 
+        $genres = null;
+        
         try {
-            $response = $this->request($show_url);
-            $content = $this->parse_html($response);
+            $description = preg_replace('/See full .+/i','',$content->filter('.summary_text')->eq(0)->text());
         } catch(Exception $e){
-            $this->logger->error('Failed To Find IMDB Page. Skipping');
+            $this->logger->error('Unrecognised Page Type: '.$e->getMessage());
             return false;
         }
 
 
-        file_put_contents(__DIR__.'/../Downloads/Details/imdb_page.html',$content->html());
+        $content->filter('#titleStoryLine')->each(function(Crawler $node, $i){
 
-        $content_found = false;
-
-        for($i =0;$i < $this->config->retry->request->times;$i++){
-
-            try {
-
-                $series_name = trim($content->filter('h1')->eq(0)->text());
-        
-                $series_details = new Data();
-        
+            $node->filter('.see-more')->each(function(Crawler $node, $i){
                 global $genres;
-        
-                $genres = null;
-                
-                try {
-                    $description = preg_replace('/See full .+/i','',$content->filter('.summary_text')->eq(0)->text());
-                } catch(Exception $e){
-                    $this->logger->error('Unrecognised Page Type: '.$e->getMessage());
-                    return false;
-                }
-
-
-                $content->filter('#titleStoryLine')->each(function(Crawler $node, $i){
-        
-                    $node->filter('.see-more')->each(function(Crawler $node, $i){
-                        global $genres;
-        
-                        try {
-                            $content_type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
-        
-                            if($content_type == 'genres'){
-        
-                                $genres = $node->filter('a')->each(function(Crawler $node, $i){
-                                    return $node->text();
-                                });
-        
-                            }
-                            
-                        } catch(Exception $e){
-                            
-                        }
-                        
-                    });
-        
-                });
-        
-                try {
-                    global $released_date;
-        
-                    $released_date = null;
-        
-                    $content->filter('#titleDetails .txt-block')->each(function(Crawler $node, $i){
-                        global $released_date;
-        
-                        $text = $node->text();
-
-                        preg_match('/release date/i',$text,$matches);
-                        
-                        if( $matches ){
-                            $this->logger->debug($text);
-
-                            preg_match('/: (.+)\([^\(\)]+\)/',$text,$matches);
-                            return $released_date = trim($matches[1]);   
-                        }
-        
-                    });
-                } catch(Exception $e){
-                   
-                }
-        
-                try {
-                    $image = $content->filter('.poster img')->eq(0)->attr('src');
-                } catch(Exception $e){
-                    $image = null;
-                }
 
                 try {
-                    $rating = $content->filter('.ratingValue')->eq(0)->text();
-                } catch(Exception $e){
-                    $rating = null;
-                }
+                    $content_type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
 
-                $series_details->name = htmlspecialchars( preg_replace('/^\s+|\s+$/','',$series_name) );
-                $series_details->old_name = htmlspecialchars($name);
+                    if($content_type == 'genres'){
 
-                $genres = implode(', ',(array)$genres);
+                        $genres = $node->filter('a')->each(function(Crawler $node, $i){
+                            return $node->text();
+                        });
 
-                $series_details->imdb_url = $show_url;
-                $series_details->description = $description;
-                $series_details->genres = $genres;
-
-                $series_details->released = $released_date;
-                $series_details->image = $image;
-                $series_details->rating = (float)$rating;
-
-                try {
-                    $series_details->num_reviews = str_replace(',','',$content->filter('[itemprop="ratingCount"]')->eq(0)->text());
-                } catch(Exception $e) {
-                    $series_details->num_reviews = 0;
-                }
-                
-
-                $this->logger->debug($name.' === '.$series_details->name);
-                $this->logger->debug('Genre: '. $genres);
-                $this->logger->debug('Released: '.$released_date);
-
-                $this->logger->debug('IMDB Rating: '.$rating);
-
-                if($content_type == 'series'){
-
-                    $series_details->tv_series = true;
-
-                    try {
-                        $total_season_number = (int)$content->filter('.seasons-and-year-nav div a')->first()->text();
-                    } catch(Exception $e) {
-                        $this->logger->error('Not A Show. Skipping.');
-                        return false;
                     }
                     
+                } catch(Exception $e){
+                    
+                }
+                
+            });
 
-                    $seasons_list = [];
+        });
 
-                    $this->logger->debug("$total_season_number Total Season Found");
+        try {
+            global $released_date;
 
-                    // $series_details->num_seasons = $total_season_number;
+            $released_date = null;
 
-                    //Gettting Season Episode Details.
+            $content->filter('#titleDetails .txt-block')->each(function(Crawler $node, $i){
+                global $released_date;
+
+                $text = $node->text();
+
+                preg_match('/release date/i',$text,$matches);
+                
+                if( $matches ){
+                    $this->logger->debug($text);
+
+                    preg_match('/: (.+)\([^\(\)]+\)/',$text,$matches);
+                    return $released_date = trim($matches[1]);   
+                }
+
+            });
+        } catch(Exception $e){
+            $this->logger->error('Error Getting Realeased Date');
+        }
+
+        try {
+            $image = $content->filter('.poster img')->eq(0)->attr('src');
+        } catch(Exception $e){
+            $image = null;
+        }
+
+        try {
+            $rating = $content->filter('.ratingValue')->eq(0)->text();
+        } catch(Exception $e){
+            $rating = null;
+        }
+
+        $series_details->name = htmlspecialchars( preg_replace('/^\s+|\s+$/','',$series_name) );
+
+        $genres = implode(', ',(array)$genres);
+
+        $series_details->related = $this->related($content);
+        $series_details->description = $description;
+        $series_details->genres = $genres;
+
+        $series_details->released = $released_date;
+        $series_details->image = $image;
+        $series_details->rating = (float)$rating;
+
+        $series_details->show_id = $this->url_id( $series_details->imdb_url );
+        
+        try {
+            $series_details->num_reviews = str_replace(',','',$content->filter('[itemprop="ratingCount"]')->eq(0)->text());
+        } catch(Exception $e) {
+            $series_details->num_reviews = 0;
+        }
+        
+        $old_name = $series_details->old_name ?? $series_details->name;
+        $new_name = $series_details->name;
+
+        $this->logger->debug("$old_name === $new_name");
+        $this->logger->debug('Genre: '. $genres);
+        $this->logger->debug('Released: '.$released_date);
+
+        $this->logger->debug('IMDB Rating: '.$rating);
+
+        if($series_details->content_type == 'series'){
+            $this->season_details($content,$series_details);
+        }
+
+    }
+
+    public function season_details($content,$series_details){
+
+        $series_details->tv_series = true;
+        $seasons_list = [];
+
+        try {
+            $total_season_number = (int)$content->filter('.seasons-and-year-nav div a')->first()->text();
+        } catch(Exception $e) {
+            $this->logger->error('No Seasons Found');
+            $series_details->seasons = $seasons_list;
+            return false;
+        }
+        
+        $this->logger->debug("$total_season_number Total Season Found");
+
+        try {
+
+            for($i =0; $i < $total_season_number;$i++){
+
+                global $episodes_list,$season_url,$season_number;
+
+                $season = new Data();
+                
+                $season_number = $i + 1;
+                $season_url = "https://www.imdb.com/title/{$series_details->show_id}/episodes/_ajax?season=$season_number";
+
+                $season->season_number = $season_number;
+                $season->imdb_url = $season_url;
+
+                $response = $this->request($season_url);
+                $content = $this->parse_html($response);
+                
+                if(!$content){
+                    break;
+                }
+
+                $episodes_list = [];
+
+                $content->filter('.list_item')->each(function(Crawler $node, $i) {
+                    global $episodes_list,$season_number;
+
+                    $episode = new Data();
 
                     try {
 
-                        for($i =0; $i < $total_season_number;$i++){
+                        $episode->episode_number = trim(preg_replace('/\(|\)|,/','',$node->filter('[itemprop="episodeNumber"]')->attr('content')));
+                        $episode->name = trim($node->filter('[itemprop="name"]')->attr('title'));
+                        $episode->description = trim($node->filter('[itemprop="description"]')->text());
+                        $episode->released = trim($node->filter('.airdate')->text());
+                        $episode->rating = trim($node->filter('.ipl-rating-star__rating')->text());
+                        $episode->num_reviews = trim(preg_replace('/\(|\)|,/','',$node->filter('.ipl-rating-star__total-votes')->text()));
+                        $episode->image = $node->filter('img')->attr('src');
 
-                            global $episodes_list,$season_url,$season_number;
-    
-                            $season = new Data();
-                            
-                            $season_number = $i + 1;
-                            $season_url = "https://www.imdb.com/title/$show_id/episodes/_ajax?season=$season_number";
-    
-                            $season->season_number = $season_number;
-                            $season->imdb_url = $season_url;
-    
-                            $response = $this->request($season_url);
-                            $content = $this->parse_html($response);
-                            
-                            if(!$content){
-                                break;
-                            }
-
-                            $episodes_list = [];
-    
-                            $content->filter('.list_item')->each(function(Crawler $node, $i) {
-                                global $episodes_list,$season_url,$season_number;
-    
-                                $episode = new Data();
-    
-                                try {
-    
-                                    $episode->episode_number = trim(preg_replace('/\(|\)|,/','',$node->filter('[itemprop="episodeNumber"]')->attr('content')));
-                                    $episode->name = trim($node->filter('[itemprop="name"]')->attr('title'));
-                                    $episode->description = trim($node->filter('[itemprop="description"]')->text());
-                                    $episode->released = trim($node->filter('.airdate')->text());
-                                    $episode->rating = trim($node->filter('.ipl-rating-star__rating')->text());
-                                    $episode->num_reviews = trim(preg_replace('/\(|\)|,/','',$node->filter('.ipl-rating-star__total-votes')->text()));
-                                    $episode->image = $node->filter('img')->attr('src');
-    
-                                } catch(Exception $e) {
-                                    $this->logger->debug("No Details: Season $season_number - Episode $i");
-                                }
-    
-                                
-                                $episodes_list[] = $episode;
-    
-                            });
-    
-                            $season->episodes = $episodes_list;
-                            
-                            $seasons_list[] = $season;
-                        }
-
-                    } catch(Exception $e){
-                        $this->logger->error('Season Details Error: '.$e->getMessage());
+                    } catch(Exception $e) {
+                        $this->logger->debug("No Details: Season $season_number - Episode $i");
                     }
 
-                    $series_details->seasons = $seasons_list;
+                    $episodes_list[] = $episode;
 
-                }
+                });
+
+                $season->episodes = $episodes_list;
                 
-                $content_found = true;
-                break;
-
-            } catch(Exception $e){
-                $this->logger->error('Content Not Found. Reloading Page');
-
-                $response = $this->request($show_url);
-                $content = $this->parse_html($response);
-                
-                sleep( $this->config->retry->request->wait );
+                $seasons_list[] = $season;
             }
-            
+
+        } catch(Exception $e){
+            $this->logger->error('Season Details Error: '.$e->getMessage());
         }
 
-        if(!$content_found){
-            print_r($content_found);
-            throw new Exception('Failed To Find Details');
+        $series_details->seasons = $seasons_list;
+
+    }
+
+    public function related($content){
+
+        global $names;
+        $names = [];
+
+        $content->filter('.rec_item a')->each(function(Crawler $node, $i){
+            global $names;
+
+            $link = $node->attr('href');
+            $id = $this->url_id($link);
+            $name = $node->filter('img')->eq(0)->attr('title');
+
+            $names[$id] = $name;
+
+        });
+
+        return $names;
+    }
+
+    public function url_id($imdb_url){
+
+        preg_match('/title\/(\w+)/', $imdb_url,$matches);
+
+        if(!$matches){
+            throw new Exception('No IMDB ID URL Found: '. $imdb_url );
+        } else {
+            return $matches[1];
         }
-
-        return $series_details;
-
     }
 
     private function contains_tv($string){
