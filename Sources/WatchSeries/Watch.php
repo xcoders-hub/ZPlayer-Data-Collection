@@ -66,6 +66,8 @@ class Watch extends Request {
                     if($matches){
                         $vidcloud_id = $matches[1];
                         
+                        $vidcloud_page = $url;
+                        
                         if(!key_exists($vidcloud_id,$vidcloud_id_history)){
                             $vidcloud_id_history[$vidcloud_id] = 1;
                         } else {
@@ -101,6 +103,14 @@ class Watch extends Request {
                         $sources = array_merge($sources,$video_sources);
                     }
                     
+                    if($vidcloud_page){
+                        $source = new Data();
+                        $source->quality = '';
+                        $source->url = $vidcloud_page;
+                        $source->server_name = 'Content Page';
+
+                        array_unshift($sources,$source);
+                    }
 
                 }
 
