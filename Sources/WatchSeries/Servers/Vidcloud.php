@@ -41,7 +41,7 @@ class Vidcloud extends Request {
                     $source = new Data();
                     $source->quality = '';
                     $source->url = $url;
-                    $source->server_name = 'vidcloud';
+                    $source->server_name = 'Vidcloud';
         
                     $vid_sources[] = $source;
     
