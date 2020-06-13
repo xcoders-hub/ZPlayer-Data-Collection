@@ -38,7 +38,9 @@
 
         'update' => [
             'series' => '/contents/series/update'
-        ]
+        ],
+
+        'released' => '/released'
 
     ],
 
@@ -49,6 +51,13 @@
         'series' => '/watch-series',
         'movies' => '/letters',
 
+    ],
+
+    'released_page' => [
+        'url' => 'https://vidcloud9.com/',
+
+        'series'=> 'series',
+        'movies'=> 'movies',
     ],
 
     'retry' => [
