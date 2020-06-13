@@ -21,6 +21,10 @@ if(count($argv) < 2){
         $content->update();
     } elseif(strtolower($argv[1] == 'similar')){
         $content->similar();
+    } elseif(strtolower($argv[1] == 'released')){
+        $released = new Recent($Config,$logger);
+        $content_type = $argv[2] ?? die('No Content Type Found: Update Series/Movies');
+        $released->recent_content($content_type);
     } else {
         die('Type Required: Movie or Series');
     }

@@ -271,7 +271,7 @@ class NewContent extends IMDB {
 
     }
 
-    private function send_details($details,$content_type){
+    public function send_details($details,$content_type){
 
         file_put_contents(__DIR__.'/../Downloads/Details/Details_Request.json',json_encode($details));
 
@@ -288,7 +288,7 @@ class NewContent extends IMDB {
     }
 
     private function similar_complete($content_id){
-        $url =   $this->config->api->url . $this->config->api->similar;
+        $url = $this->config->api->url . $this->config->api->similar;
 
         if(!$content_id){
             throw new Exception('No ID Found: '.$content_id);
