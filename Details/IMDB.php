@@ -6,6 +6,7 @@ use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 use Shared\Request;
 use Data\Data;
+use DateTime;
 
 // Fetches Information for any given show/Movie using IMDB
 class IMDB extends Request {
@@ -169,7 +170,12 @@ class IMDB extends Request {
 
     public function details($content,$series_details){
 
-        $series_name = trim($content->filter('h1')->eq(0)->text());
+        try {
+            $series_name = trim($content->filter('h1')->eq(0)->text());
+        } catch(Exception $e) {
+            throw new Exception('No Series Name Found');
+        }
+        
         
         global $genres;
 
@@ -183,29 +189,36 @@ class IMDB extends Request {
         }
 
 
-        $content->filter('#titleStoryLine')->each(function(Crawler $node, $i){
+        try {
 
-            $node->filter('.see-more')->each(function(Crawler $node, $i){
-                global $genres;
+            $content->filter('#titleStoryLine')->each(function(Crawler $node, $i){
 
-                try {
-                    $content_type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
-
-                    if($content_type == 'genres'){
-
-                        $genres = $node->filter('a')->each(function(Crawler $node, $i){
-                            return $node->text();
-                        });
-
+                $node->filter('.see-more')->each(function(Crawler $node, $i){
+                    global $genres;
+    
+                    try {
+                        $content_type = str_replace(':','',strtolower($node->filter('h4')->eq(0)->text()));
+    
+                        if($content_type == 'genres'){
+    
+                            $genres = $node->filter('a')->each(function(Crawler $node, $i){
+                                return $node->text();
+                            });
+    
+                        }
+                        
+                    } catch(Exception $e){
+                        
                     }
                     
-                } catch(Exception $e){
-                    
-                }
-                
+                });
+    
             });
 
-        });
+        } catch(Exception $e) {
+            $this->logger->error('Error: No Genres Found');
+        }
+
 
         try {
             global $released_date;
@@ -222,8 +235,7 @@ class IMDB extends Request {
                 if( $matches ){
                     $this->logger->debug($text);
 
-                    preg_match('/: (.+)\([^\(\)]+\)/',$text,$matches);
-                    return $released_date = trim($matches[1]);   
+                    $released_date = $this->parse_date($text);
                 }
 
             });
@@ -307,14 +319,23 @@ class IMDB extends Request {
                 $season->season_number = $season_number;
                 $season->imdb_url = $season_url;
 
-                $response = $this->request($season_url);
-                $content = $this->parse_html($response);
+                $episodes_list = [];
+
+                try {
+                    $response = $this->request($season_url);
+                    $content = $this->parse_html($response);
+                } catch(Exception $e) {
+                    $this->logger->error('Failed To Find Season Page: '.$season_url);
+                    $season->episodes = $episodes_list;
+                    $seasons_list[] = $season;
+                    
+                    continue;
+                }
+
                 
                 if(!$content){
                     break;
                 }
-
-                $episodes_list = [];
 
                 $content->filter('.list_item')->each(function(Crawler $node, $i) {
                     global $episodes_list,$season_number;
@@ -326,7 +347,7 @@ class IMDB extends Request {
                         $episode->episode_number = trim(preg_replace('/\(|\)|,/','',$node->filter('[itemprop="episodeNumber"]')->attr('content')));
                         $episode->name = trim($node->filter('[itemprop="name"]')->attr('title'));
                         $episode->description = trim($node->filter('[itemprop="description"]')->text());
-                        $episode->released = trim($node->filter('.airdate')->text());
+                        $episode->released = $this->parse_date( trim($node->filter('.airdate')->text()) );
                         $episode->rating = trim($node->filter('.ipl-rating-star__rating')->text());
                         $episode->num_reviews = trim(preg_replace('/\(|\)|,/','',$node->filter('.ipl-rating-star__total-votes')->text()));
                         $episode->image = $node->filter('img')->attr('src');
@@ -340,8 +361,8 @@ class IMDB extends Request {
                 });
 
                 $season->episodes = $episodes_list;
-                
                 $seasons_list[] = $season;
+
             }
 
         } catch(Exception $e){
@@ -360,15 +381,30 @@ class IMDB extends Request {
         $content->filter('.rec_item a')->each(function(Crawler $node, $i){
             global $names;
 
-            $link = $node->attr('href');
-            $id = $this->url_id($link);
-            $name = $node->filter('img')->eq(0)->attr('title');
+            try {
 
-            $names[$id] = $name;
+                $link = $node->attr('href');
+                $id = $this->url_id($link);
+                $name = $node->filter('img')->eq(0)->attr('title');
+    
+                $names[$id] = $name;
+
+            } catch(Exception $e) {
+                $this->logger->error('Error With Related Items');
+            }
+
 
         });
 
         return $names;
+    }
+
+    public function parse_date($text_date){
+        preg_match('/: (.+)\([^\(\)]+\)/',$text_date,$matches);
+        $released_date = trim($matches[1]);   
+
+        $released_date = date("Y-m-d H:i:s", strtotime($released_date));
+        return $released_date;
     }
 
     public function url_id($imdb_url){
