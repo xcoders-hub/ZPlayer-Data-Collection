@@ -25,8 +25,8 @@ class Server extends Shared {
 
         $this->logger->debug('Response: '.$request_json);
 
-        $this->config->retry->request->wait = 5;
-        $this->config->retry->request->times = 3;
+        $this->config->retry->request->wait = 1;
+        $this->config->retry->request->times = 2;
 
         global $sources;
                 
