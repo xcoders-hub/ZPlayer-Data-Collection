@@ -12,7 +12,7 @@ use DateTime;
 class IMDB extends Request {
 
     public function overview($name,$content_type,$year=false,$show_id=false){
-        
+
         if(!$show_id){
             $show_id = $this->get_show_id($name,$content_type,$year);
         } else {
@@ -47,15 +47,24 @@ class IMDB extends Request {
         $this->logger->debug('IMDB URL: '.$series_details->imdb_url);
 
         try {
-            $response = $this->request($series_details->imdb_url);
+            $response = $this->request($series_details->imdb_url,'GET',[
+                "accept"=> "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "accept-language"=> "en-GB,en-US;q=0.9,en;q=0.8",
+                "cache-control"=> "no-cache",
+                "pragma"=> "no-cache",
+                "sec-fetch-dest"=> "document",
+                "sec-fetch-mode"=> "navigate",
+                "sec-fetch-site"=> "same-origin",
+                "sec-fetch-user"=> "?1",
+                "upgrade-insecure-requests"=> "1",
+                "cookie"=> "ubid-main=130-7660257-8574069; session-id=139-1602599-9153519; x-main=\"8euu4vYv@vFM7w577COwGXYL2WjmFEqo6Y7@@dyAvXWag0soHJl98a77i4H8Ql8I\"; at-main=Atza|IwEBIBxNUtufzqyHlA3SKzy-lF1wc53ZbD3FhRu2pCTvmQjRXmGEC9DHpeh0YzBApCktcuQylexqTItZy5T9KgRDJIzv3EHskNR50f_GB2xZi_IGvBNi_CY8yDUPFz3k29NZlbVDizTqgjfxl4cJRFmWt1UtiLt518vAiyPlqJOb5-GzZ1TXyj4mmFBjP4YXTwjSu3ozxjVdDn2ZZFLFxd6AZEgghVkoR0PiVteO641_S38GCr5hI8Qj6kyBmkjrFbJhHe9FVXj0MD3S8X6vaPy7U6oj4viQFU3ag1Zk6HmZSdJrybWIXMSmhmL_UrXx4S3Wg6R3pNqiKt1dq-_M7ZwKXClbDPA3VWlzlVdSYJLOKV0kX13Z44brgFFnilaMHlC6sGQltzYgZAvl1xEjKSD5G-IJ; sess-at-main=\"r5f1VhJxuIilq5msbLbtLakEovV2xMBIKQUSpWHae30=\"; uu=BCYnWmGjHdPyUK-Uu9htTJfmZQSymT4oICtLM1sc-nEC5zRT5cdHBLnlIttZoHsUN4JUmpzOFFUG%0D%0A48__mIkNdr1qPC9yKWwutjjnn7YbHQC30-T_cuvC6rIiDqzR0HRGSRV9t2TZFLUmFrQag6dJxgWX%0D%0Ax1PErdnaccJp-l_MxXkN6m8%0D%0A; session-id-time=2082787201l; adblk=adblk_yes; session-token=3jJgqk/Zg38LmpcLOdfqnRC2wrclnolAgsdAUD60zI/w5E9obzThkveaRiEma43PBmqv3Pj49tulRxptX6xsmkcxFxkHc1MZi7toArpDrqY5OQIUdBhHy7A+PeKp2P3XH36x6mgDTq/U9AY3usLiAq3vF3p4Q7ARCZser7hUzg/PwvlZSFwJj+IdLcWOYVek8kgHe7Vf0e/1mOa0nY0VxQ==; csm-hit=tb:Q08AJMRT6YYKPS1K8BJK+s-Q08AJMRT6YYKPS1K8BJK|1592138579688&t:1592138579688&adb:adblk_yes"
+            ]);
+            file_put_contents(__DIR__."/../Downloads/Details/{$series_details->show_id}_imdb_page.html",$response);
             $content = $this->parse_html($response);
         } catch(Exception $e){
             $this->logger->error('Failed To Find IMDB Page. Skipping');
             return false;
         }
-
-
-        file_put_contents(__DIR__.'/../Downloads/Details/imdb_page.html',$content->html());
 
         $content_found = false;
 
@@ -71,6 +80,7 @@ class IMDB extends Request {
 
             } catch(Exception $e){
                 $this->logger->error('Content Not Found. Reloading Page: '.$e->getMessage());
+                $this->logger->error('Error: '.$e->getTraceAsString());
 
                 $response = $this->request($series_details->imdb_url);
                 $content = $this->parse_html($response);
@@ -108,13 +118,24 @@ class IMDB extends Request {
             $parsed_name .= "_$year";
         }
         
-        $search_url = "https://v2.sg.media-imdb.com/suggestion/$first_letter/$parsed_name.json";
-        $response = $this->request($search_url);
-        $content = $this->parse_json($response);        
+        try {
+            $search_url = "https://v2.sg.media-imdb.com/suggestion/$first_letter/$parsed_name.json";
+            $response = $this->request($search_url);
+            $content = $this->parse_json($response);     
+        } catch(Exception $e) {
+            $this->logger->error('Failed To Suggestion Search: '.$parsed_name);
+            $new_parsed_name = str_replace('%','',$parsed_name);
+            $this->logger->error('Trying as: '.$new_parsed_name);
+
+            $search_url = "https://v2.sg.media-imdb.com/suggestion/$first_letter/$new_parsed_name.json";
+            $response = $this->request($search_url);
+            $content = $this->parse_json($response);   
+        }
+   
 
         file_put_contents(__DIR__.'/../Downloads/Details/imdb_search.json',$response);
 
-        if(!property_exists($content,'d')){
+        if(!$content || !property_exists($content,'d')){
             return null;
         }
 
@@ -175,7 +196,6 @@ class IMDB extends Request {
         } catch(Exception $e) {
             throw new Exception('No Series Name Found');
         }
-        
         
         global $genres;
 
@@ -401,9 +421,14 @@ class IMDB extends Request {
 
     public function parse_date($text_date){
         preg_match('/: (.+)\([^\(\)]+\)/',$text_date,$matches);
-        $released_date = trim($matches[1]);   
 
-        $released_date = date("Y-m-d H:i:s", strtotime($released_date));
+        if($matches){
+            $released_date = trim($matches[1]);   
+            $released_date = date("Y-m-d H:i:s", strtotime($released_date));
+        } else {
+            $released_date = date("Y-m-d H:i:s", strtotime(str_replace('.','',$text_date)));
+        }
+
         return $released_date;
     }
 
