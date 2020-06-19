@@ -57,18 +57,20 @@ class Update extends Shared {
     
                 if(!$content_url){
                     //No URL Found, Get New Sources Instead OF Updating OLD
+                } else {
+
+                    $sources = $this->fetch_sources( $content_url );
+                
+                    $this->logger->debug('Found '.count($sources).' Sources');
+    
+                    $new_source->sources = $sources;
+    
+                    $new_source->content_url = $content_url;
+    
+                    $this->send_sources($new_source);
+
                 }
 
-                $sources = $this->fetch_sources( $content_url );
-                
-                $this->logger->debug('Found '.count($sources).' Sources');
-
-                $new_source->sources = $sources;
-
-                $new_source->content_url = $content_url;
-
-                $this->send_sources($new_source);
-                
                 $this->logger->debug("---------- Updating $name Sources Complete --------------");
             }
 
