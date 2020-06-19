@@ -103,7 +103,7 @@ class Watch extends Request {
                         $sources = array_merge($sources,$video_sources);
                     }
                     
-                    if($vidcloud_page){
+                    if(isset($vidcloud_page)){
                         $source = new Data();
                         $source->quality = '';
                         $source->url = $vidcloud_page;
@@ -121,21 +121,25 @@ class Watch extends Request {
         return $sources;
     }
 
-    public function fetch_movie($url){
+    public function fetch_movie($url,$query){
         
-        $response = $this->request($url);
-        $content = $this->parse_html($response);
-
         $movie = new Data();
 
+        $this->logger->debug("Find $query Movie In: $url");
+
         try {
+            $response = $this->request($url);
+            $content = $this->parse_html($response);
+
             $movie_url = $this->domain . $content->filter('a.view_more')->eq(0)->attr('href');
+            
+            $movie->sources = $this->fetch_sources($movie_url);
+            $movie->content_url = $movie_url;
+
         } catch(Exception $e){
-            return false;
+            $search = new Search($this->config,$this->logger);
+            $movie->sources = $search->parent_page_search($query);
         }
-        
-        $movie->sources = $this->fetch_sources($movie_url);
-        $movie->content_url = $movie_url;
 
         return $movie;
     }
@@ -194,6 +198,7 @@ class Watch extends Request {
 
         return $episode;
     }
+    
 }
 
 ?>

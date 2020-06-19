@@ -37,60 +37,76 @@ class Server extends Shared {
         $name = $this->clean_content_name($content_data->name);
         $name = preg_replace('/ and | & |:.+?\-|\?|\!/',' ',$name);
 
+        $search = new Search($this->config,$this->logger);
+
         if( $data->content_type == 'series'){
 
             $season_number = $content_data->season_number;
             $episode_number = $content_data->episode_number;
-            $series_id = $content_data->series_id;
 
             $search_string =  $name . ' Season ' .$season_number;
 
             $this->logger->debug("----------- $search_string Episode $episode_number Search -----------");
-
-            $results = $this->search_results($search_string);
             
+            $results = $search->search_results($search_string);
+
             $sources = [];
 
-            if($results){
+            if($results && key_exists('series',$results)){
 
-                $season_url = $results['series'][0]['url'] . '/season';
-                $response = $this->request($season_url);
-                $content = $this->parse_html($response);
-        
-                $this->logger->debug('Fetching Episode Link');
-                $this->logger->debug("Searching For Episode $episode_number");
+                if(count( $results['series']) > 0){
+                    $season_url = $results['series'][0]['url'] . '/season';
+                } else {
+                    //Some shows are not marked with season on page. Just a desperate attempt
+                    if($season_number == 1){
+                        $results = $search->search_results($name);
+                        $season_url = $results['movies'][0]['url'] . '/season';
+                    }
 
-                try {
-
-                    $content->filter('.vid_info a')->each(function(Crawler $node, $i) use($episode_number){
-                        global $sources;
-
-                        $name = $node->text();
-
-                        $this->logger->debug("Episode $episode_number: =~ $name");
-
-                        preg_match("/Episode $episode_number:/i",$name,$matches);
-                        
-                        if($matches){
-                            $this->logger->debug("Found $name");
-                            
-                            try {
-                                $episode = $this->fetch_episode($node);
-                                $sources = $episode->sources;
-
-                            } catch(Exception $e) {
-                                $this->logger->error('No Episode Found');
-                            }
-
-                            throw new Exception('Found Episode. Returning Sources');
-                            
-                        }
-
-                    });
-                    
-                } catch(Exception $e){
-                    $this->logger->debug('Complete');
                 }
+                
+                if($season_url){
+
+                    $response = $this->request($season_url);
+                    $content = $this->parse_html($response);
+            
+                    $this->logger->debug('Fetching Episode Link');
+                    $this->logger->debug("Searching For Episode $episode_number");
+    
+                    try {
+    
+                        $content->filter('.vid_info a')->each(function(Crawler $node, $i) use($episode_number){
+                            global $sources;
+    
+                            $name = $node->text();
+    
+                            $this->logger->debug("Episode $episode_number: =~ $name");
+    
+                            preg_match("/Episode $episode_number:/i",$name,$matches);
+                            
+                            if($matches){
+                                $this->logger->debug("Found $name");
+                                
+                                try {
+                                    $episode = $this->fetch_episode($node);
+                                    $sources = $episode->sources;
+    
+                                } catch(Exception $e) {
+                                    $this->logger->error('No Episode Found');
+                                }
+    
+                                throw new Exception('Found Episode. Returning Sources');
+                                
+                            }
+    
+                        });
+                        
+                    } catch(Exception $e){
+                        $this->logger->debug('Complete');
+                    }
+
+                }
+
 
             } else {
                 $this->logger->error('No Results Found');
@@ -99,16 +115,20 @@ class Server extends Shared {
         } else {
             $this->logger->debug("----------- $name Search Start -----------");
 
-            $results = $this->search_results($name);
+            $results = $search->search_results($name);
 
-            if(key_exists('movies',$results)){
+            if($results && key_exists('movies',$results) && count($results['movies']) > 0){
                 
-                $movie = $this->parse_results($results,'movies');
+                $movie = $this->parse_results($results,'movies',$content_data->released);
 
-                if($movie->content_url){
+                if($movie && property_exists($movie,'sources')){
                     $sources = $movie->sources;
                 }
 
+            } else {
+                //If not found on child page, check straight in parent page
+                $search = new Search($this->config,$this->logger);
+                $sources = $search->parent_page_search($name);
             }
 
             $this->logger->debug("----------- $name Search Complete -----------");
@@ -126,12 +146,6 @@ class Server extends Shared {
         $this->logger->debug('Updating Content Source List');
 
         $data->sources = $sources;
-
-        // if(isset($series_id)){
-        //     $this->new_series_sources($series_id);
-        // } else {
-        //     $this->send_sources($data);
-        // }
         
     }
 

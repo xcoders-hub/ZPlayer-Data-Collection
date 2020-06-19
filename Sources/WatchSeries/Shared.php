@@ -46,19 +46,37 @@ class Shared extends Search {
 
     }
 
-    public function parse_results($results,$content_type){
+    public function parse_results($results,$content_type,$year=false){
 
         if($results){
             $correct_results = $results[$content_type];
             
-            $item = $correct_results[0];
+            if(count($correct_results) == 0){
+                return false;
+            }
 
+            $item = $correct_results[0];
+            
+            if(key_exists('year_search_required',$results) && $results['year_search_required'] && $year){
+                $this->logger->debug('Year Search Started');
+
+                foreach($correct_results as $movie){
+
+                    if(key_exists('year',$movie) && $movie['year'] == $year){
+                        $this->logger->notice($movie['name'] . " Correct Link Found For $year: ".$movie['url']);
+                        $item = $movie;
+                    }
+                }
+
+            }
+            
             if($item && key_exists('url',$item) && $item['url']){
+                $this->logger->debug('Finding Sources In '.$item['url']);
 
                 if($content_type == 'series'){
                     $sources = $this->fetch_series($item['url']);
                 } else {
-                    $sources = $this->fetch_movie($item['url']);
+                    $sources = $this->fetch_movie($item['url'],$item['name']);
                 }
 
             } else {
@@ -93,8 +111,15 @@ class Shared extends Search {
 
                 $this->logger->debug("Finding $search_string");
                 $results = $this->search_results($search_string);
-
-                $video_episodes = $this->parse_results($results,$content_type);
+                
+                if($season_number == 1){
+                    $search = new Search($this->config,$this->logger);
+                    $results = $search->search_results($name);
+                    $season_url = $results['movies'][0]['url'];
+                    $video_episodes = $this->fetch_series($season_url);
+                } else {
+                    $video_episodes = $this->parse_results($results,$content_type);
+                }
 
                 $encoded_data = json_encode($video_episodes);
 
