@@ -9,7 +9,7 @@ if(count($argv) < 2){
     die('New Content Type Required: Movie/Series');
 } else {
     
-    $content = new NewContent($Config,$logger);
+    $content = new Information($Config,$logger);
 
     if(strtolower($argv[1]) == 'movies'){
         $logger->debug('Finding New Movies');
