@@ -40,7 +40,7 @@
             'series' => '/contents/series/update'
         ],
 
-        'released' => '/released'
+        'released' => '/recent'
 
     ],
 
@@ -53,6 +53,11 @@
 
     ],
 
+    'data_parent_page' => [
+        'url' => 'https://vidcloud9.com/',
+        'search' => '/search.html?keyword='
+    ],
+    
     'released_page' => [
         'url' => 'https://vidcloud9.com/',
 
