@@ -6,10 +6,7 @@ use DateTime;
 use Exception;
 use Symfony\Component\DomCrawler\Crawler;
 
-// Runs Daily, Get New Content And Updates. Updates Series For Show/Movie Found.
-// New Movies/Series -> New Content
-
-class Recent extends NewContent {
+class Recent extends Information {
 
     public $logger,$config,$api;
 
@@ -24,7 +21,7 @@ class Recent extends NewContent {
     public function recent_content($content_type){
         $url = $this->config->released_page->url . $this->config->released_page->$content_type;
 
-        for($page_number = 0; $page_number < 3;$page_number++){
+        for($page_number = 0; $page_number < 4;$page_number++){
             $page_url = "$url?page=$page_number";
             $response = $this->request($page_url);
             $content = $this->parse_html($response);
@@ -38,14 +35,15 @@ class Recent extends NewContent {
 
                 $title = $details->name;
 
+                $added_date = $details->date;
+
+                preg_match('/^(\d+)/',$added_date,$matches);
+
+                $released_year = $matches[1];
+
                 if(property_exists($response->data,'not_found')){
 
                     $this->logger->debug("$upper_content_type: $title Not Found. Searching...");
-
-                    $added_date = $details->date;
-
-                    preg_match('/^(\d+)/',$added_date,$matches);
-                    $released_year = $matches[1];
 
                     $this->logger->debug("---------------  $upper_content_type Start: $title ---------------");
 
@@ -61,18 +59,38 @@ class Recent extends NewContent {
     
                     $this->logger->debug("---------------  $upper_content_type Complete: $title ---------------");
 
+                    sleep(10);
                    
                 } else {
                     $this->logger->debug("$upper_content_type: $title Found and Updated");
+
+                    if($content_type == 'series'){
+
+                        $this->logger->debug("---------------  Updating $upper_content_type Start: $title ---------------");
+
+                        $details = $this->overview($title,$content_type,$released_year);
+                        
+                        if(!$details || !property_exists($details,'name')){
+                            return;
+                        } else {
+                            $details->date_added_to_site = $added_date;
+                            $details->url = null;
+                            $this->logger->debug("Setting Date Added To Site: $added_date");
+                            
+                            $this->update_details($details,'series');
+                            
+                        }   
+        
+                        $this->logger->debug("---------------  Updating $upper_content_type Complete: $title ---------------");
+
+                        sleep(5);
+                    }
+                    
                 }
 
             });
 
         }
-
-    }
-
-    public function movies(){
 
     }
 
