@@ -395,19 +395,46 @@ class IMDB extends Request {
 
     public function related($content){
 
-        global $names;
-        $names = [];
+        global $related_details;
+        $related_details = [];
 
-        $content->filter('.rec_item a')->each(function(Crawler $node, $i){
-            global $names;
+        // $content->filter('.rec_item a')->each(function(Crawler $node, $i){
+        //     global $names;
+
+        //     try {
+
+        //         $link = $node->attr('href');
+        //         $id = $this->url_id($link);
+        //         $name = $node->filter('img')->eq(0)->attr('title');
+    
+        //         $names[$id] = $name;
+
+        //     } catch(Exception $e) {
+        //         $this->logger->error('Error With Related Items');
+        //     }
+
+
+        // });
+
+        $content->filter('.rec_overview')->each(function(Crawler $node, $i){
+            global $related_details;
 
             try {
+                $content = new data();
+                $content->link = 'https://www.imdb.com' . $node->filter('a[href]')->eq(0)->attr('href');
+                $content->id = $node->attr('data-tconst');
+                $content->name = $node->filter('.rec-title b')->eq(0)->text();
+                $content->released = $node->filter('.rec-title .nobr')->text();
 
-                $link = $node->attr('href');
-                $id = $this->url_id($link);
-                $name = $node->filter('img')->eq(0)->attr('title');
+                preg_match('/tv|\d-\d|\d–\d/i',$content->released,$matches);
+                if($matches){
+                    $content_type = 'series';
+                } else {
+                    $content_type = 'movies';
+                }
     
-                $names[$id] = $name;
+                $content->content_type = $content_type;
+                $related_details[] = $content;
 
             } catch(Exception $e) {
                 $this->logger->error('Error With Related Items');
@@ -416,7 +443,7 @@ class IMDB extends Request {
 
         });
 
-        return $names;
+        return $related_details;
     }
 
     public function parse_date($text_date){
