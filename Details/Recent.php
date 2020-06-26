@@ -21,7 +21,7 @@ class Recent extends Information {
     public function recent_content($content_type){
         $url = $this->config->released_page->url . $this->config->released_page->$content_type;
 
-        for($page_number = 0; $page_number < 4;$page_number++){
+        for($page_number = 1; $page_number < 4;$page_number++){
             $page_url = "$url?page=$page_number";
             $response = $this->request($page_url);
             $content = $this->parse_html($response);
@@ -30,6 +30,7 @@ class Recent extends Information {
                 $details = $this->find_details($node,$content_type);
                 // print_r($details);
                 $response = $this->send_recent($details);
+                $response_data = $response->data;
 
                 $upper_content_type = ucwords($content_type);
 
@@ -62,28 +63,36 @@ class Recent extends Information {
                     sleep(10);
                    
                 } else {
-                    $this->logger->debug("$upper_content_type: $title Found and Updated");
+                    $this->logger->debug("$upper_content_type: $title Found and Updating Now If Required");
 
                     if($content_type == 'series'){
 
-                        $this->logger->debug("---------------  Updating $upper_content_type Start: $title ---------------");
+                        if(property_exists($response_data,'update_required') && $response_data->update_required){
+                            $this->logger->notice('Update Series Required. Last Update Was '.$response_data->time_difference.' Days Ago');
 
-                        $details = $this->overview($title,$content_type,$released_year);
-                        
-                        if(!$details || !property_exists($details,'name')){
-                            return;
+                            $this->logger->notice("---------------  Updating $upper_content_type Start: $title ---------------");
+
+                            $details = $this->overview($title,$content_type,$released_year);
+                            
+                            if(!$details || !property_exists($details,'name')){
+                                return;
+                            } else {
+                                $details->date_added_to_site = $added_date;
+                                $details->url = null;
+                                $this->logger->debug("Setting Date Added To Site: $added_date");
+                                
+                                $this->update_details($details,'series');
+                                
+                            }   
+            
+                            $this->logger->notice("---------------  Updating $upper_content_type Complete: $title ---------------");
+
+                            sleep(5);
+
                         } else {
-                            $details->date_added_to_site = $added_date;
-                            $details->url = null;
-                            $this->logger->debug("Setting Date Added To Site: $added_date");
-                            
-                            $this->update_details($details,'series');
-                            
-                        }   
-        
-                        $this->logger->debug("---------------  Updating $upper_content_type Complete: $title ---------------");
+                            $this->logger->notice('Update Not Required');
+                        }
 
-                        sleep(5);
                     }
                     
                 }
@@ -104,6 +113,8 @@ class Recent extends Information {
         $date = $node->filter('.date')->text();
 
         $this->logger->debug('New Content Found: '.$content->name);
+
+        $this->logger->debug('Content Date Text Parsed: '.$date);
 
         preg_match('/(\d+) hour/',$date,$hour_matches);
         preg_match('/(\d+) minute/',$date,$minute_matches);
