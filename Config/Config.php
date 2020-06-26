@@ -28,9 +28,9 @@
             'delete' => '/sources/delete',
         ],
 
-        'details' => [
-            'series' => '/contents/series'
-        ],
+        'details' => '/contents',
+
+        'imdb_new' => '/contents/imdb_new',
 
         'similar' => '/contents/similar',
 
