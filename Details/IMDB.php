@@ -15,6 +15,10 @@ class IMDB extends Request {
 
         if(!$show_id){
             $show_id = $this->get_show_id($name,$content_type,$year);
+
+            if(!$show_id){
+                $show_id = $this->get_show_id($name,$content_type);
+            }
         } else {
             $this->logger->debug('Show Id Passed In: '.$show_id);
         }
@@ -46,6 +50,8 @@ class IMDB extends Request {
 
         $this->logger->debug('IMDB URL: '.$series_details->imdb_url);
 
+        $show_id = $series_details->show_id ?? 0;
+
         try {
             $response = $this->request($series_details->imdb_url,'GET',[
                 "accept"=> "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -59,7 +65,7 @@ class IMDB extends Request {
                 "upgrade-insecure-requests"=> "1",
                 "cookie"=> "ubid-main=130-7660257-8574069; session-id=139-1602599-9153519; x-main=\"8euu4vYv@vFM7w577COwGXYL2WjmFEqo6Y7@@dyAvXWag0soHJl98a77i4H8Ql8I\"; at-main=Atza|IwEBIBxNUtufzqyHlA3SKzy-lF1wc53ZbD3FhRu2pCTvmQjRXmGEC9DHpeh0YzBApCktcuQylexqTItZy5T9KgRDJIzv3EHskNR50f_GB2xZi_IGvBNi_CY8yDUPFz3k29NZlbVDizTqgjfxl4cJRFmWt1UtiLt518vAiyPlqJOb5-GzZ1TXyj4mmFBjP4YXTwjSu3ozxjVdDn2ZZFLFxd6AZEgghVkoR0PiVteO641_S38GCr5hI8Qj6kyBmkjrFbJhHe9FVXj0MD3S8X6vaPy7U6oj4viQFU3ag1Zk6HmZSdJrybWIXMSmhmL_UrXx4S3Wg6R3pNqiKt1dq-_M7ZwKXClbDPA3VWlzlVdSYJLOKV0kX13Z44brgFFnilaMHlC6sGQltzYgZAvl1xEjKSD5G-IJ; sess-at-main=\"r5f1VhJxuIilq5msbLbtLakEovV2xMBIKQUSpWHae30=\"; uu=BCYnWmGjHdPyUK-Uu9htTJfmZQSymT4oICtLM1sc-nEC5zRT5cdHBLnlIttZoHsUN4JUmpzOFFUG%0D%0A48__mIkNdr1qPC9yKWwutjjnn7YbHQC30-T_cuvC6rIiDqzR0HRGSRV9t2TZFLUmFrQag6dJxgWX%0D%0Ax1PErdnaccJp-l_MxXkN6m8%0D%0A; session-id-time=2082787201l; adblk=adblk_yes; session-token=3jJgqk/Zg38LmpcLOdfqnRC2wrclnolAgsdAUD60zI/w5E9obzThkveaRiEma43PBmqv3Pj49tulRxptX6xsmkcxFxkHc1MZi7toArpDrqY5OQIUdBhHy7A+PeKp2P3XH36x6mgDTq/U9AY3usLiAq3vF3p4Q7ARCZser7hUzg/PwvlZSFwJj+IdLcWOYVek8kgHe7Vf0e/1mOa0nY0VxQ==; csm-hit=tb:Q08AJMRT6YYKPS1K8BJK+s-Q08AJMRT6YYKPS1K8BJK|1592138579688&t:1592138579688&adb:adblk_yes"
             ]);
-            file_put_contents(__DIR__."/../Downloads/Details/{$series_details->show_id}_imdb_page.html",$response);
+            file_put_contents(__DIR__."/../Downloads/Details/{$show_id}_imdb_page.html",$response);
             $content = $this->parse_html($response);
         } catch(Exception $e){
             $this->logger->error('Failed To Find IMDB Page. Skipping');
@@ -275,7 +281,8 @@ class IMDB extends Request {
             $rating = null;
         }
 
-        $series_details->name = htmlspecialchars( preg_replace('/^\s+|\s+$/','',$series_name) );
+        $series_name = preg_replace('/\(\d{4}\)\s*/','',$series_name);
+        $series_details->name = str_replace('&nbsp;','',htmlentities( preg_replace('/^\s+|\s+$/','',$series_name),ENT_QUOTES ));
 
         $genres = implode(', ',(array)$genres);
 
@@ -426,8 +433,10 @@ class IMDB extends Request {
                 $content->name = $node->filter('.rec-title b')->eq(0)->text();
                 $content->released = $node->filter('.rec-title .nobr')->text();
 
-                preg_match('/tv|\d-\d|\d–\d/i',$content->released,$matches);
-                if($matches){
+                preg_match('/tv|\d-\d|\d–\d/i',$content->released,$series_matches);
+                preg_match('/tv|\d-\d|\d–\d/i',$content->released,$movies_matches);
+
+                if($series_matches && !$movies_matches){
                     $content_type = 'series';
                 } else {
                     $content_type = 'movies';

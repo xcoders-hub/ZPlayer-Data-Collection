@@ -267,14 +267,14 @@ class Information extends IMDB {
 
     }
 
-    private function similar_complete($content_id){
+    private function similar_complete($content_id,$related){
         $url = $this->config->api->url . $this->config->api->similar;
 
         if(!$content_id){
             throw new Exception('No ID Found: '.$content_id);
         }
 
-        $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => ['content_id' => $content_id] ]);
+        $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => ['content_id' => $content_id,'related' => $related] ]);
         $response = $this->parse_json($api_response);
 
         if(property_exists($response,'errors')){
@@ -398,30 +398,48 @@ class Information extends IMDB {
                     if($success_status){
 
                         $content_id = $details->id;
+                        $related_contents = $details->related;
 
-                        foreach($details->related as $related_content){
-                            $name = $related_content->name;
-                            $id = $related_content->id;
-                            $content_type = $related_content->content_type;
-                            $released = $related_content->released;
-
-                            $this->logger->debug("--------------- Similar Start: $name({$content_type}) - $released ---------------");
-                            
-                            $details = $this->overview($name,$content_type,false,$id);
+                        $new_ids = $this->new_imdb_content($related_contents);
                         
-                            if(!$details || !property_exists($details,'name')){
-                                continue;
-                            } else {
-                                $this->send_details($details,$content_type);
+                        if($new_ids){
+
+                            $this->logger->debug("New Similar Contents Found.");
+
+                            foreach($details->related as $related_content){
+                                $name = $related_content->name;
+                                $id = $related_content->id;
+                                $content_type = $related_content->content_type;
+                                $released = $related_content->released;
+    
+                                if(!property_exists($new_ids,$id)){
+                                    $this->logger->notice("Existing Similar Content: $name({$content_type})");
+                                } else {
+                                    $this->logger->notice("New Similar Content: $name({$content_type})");
+
+                                    $this->logger->notice("--------------- Similar Start: $name({$content_type}) - $released ---------------");
+                                
+                                        $similar_details = $this->overview($name,$content_type,false,$id);
+                                    
+                                        if(!$similar_details || !property_exists($similar_details,'name')){
+                                            continue;
+                                        } else {
+                                            $this->send_details($similar_details,$content_type);
+                                        }
+            
+                                    $this->logger->notice("--------------- Similar Complete: $name({$content_type}) - $released ---------------");
+
+                                }
+                                
                             }
 
-                            $this->logger->debug("--------------- Similar Complete: $name({$content_type}) - $released ---------------");
-        
+                        } else {
+                            $this->logger->debug("No New Similar Contents Found. Updating ...");
                         }
-                        
-                        $this->logger->debug('Updating Similar Field: '.$content_id);
+
+                        $this->logger->notice('Similar Search Complete: '.$content_id);
         
-                        $this->similar_complete($content_id);
+                        $this->similar_complete($content_id,$related_contents);
 
                     }
 
@@ -433,6 +451,31 @@ class Information extends IMDB {
 
         }
 
+    }
+
+    public function content_details($content_id){
+        $url = $this->config->api->url . $this->config->details . "/$content_id";
+
+        $response = $this->request($url);
+        $content = $this->parse_json($response);
+
+        return $content;
+    }
+
+    public function new_imdb_content($contents){
+        $search = [];
+
+        foreach($contents as $content){
+            $search[] = $content->id;
+        }
+
+        $search_string = join(',',$search);
+        $url = $this->config->api->url . $this->config->api->imdb_new . "/$search_string";
+
+        $response = $this->request($url);
+        $content = $this->parse_json($response);
+
+        return $content->data->new;
     }
 
 }
