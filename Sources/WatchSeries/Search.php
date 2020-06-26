@@ -62,6 +62,21 @@ class Search extends Watch {
             $content = $this->parse_html($response);    
         }   
 
+        if($content->filter('li.video-block')->count() == 0){
+            preg_match('/(?=[MDCLXVI])M*(C[MD]|D?C*)(X[CL]|L?X*)(I[XV]|V?I*)/',$query,$matches);
+
+            if($matches){
+                $roman_match = $matches[count($matches) - 1];
+                $number = $this->convert_roman_numerals_to_number($roman_match);
+                $this->logger->debug("Roman Conveted: $roman_match -> $number");
+                $query = preg_replace("/$roman_match/",$number,$query);
+                $this->logger->debug('Roman Numeral Converted. New Query: '.$query);
+                $response = $this->request($this->domain."/search.html?keyword=$query");
+                $content = $this->parse_html($response);  
+            }
+
+        }
+
         $content->filter('li.video-block')->each(function(Crawler $node, $i){
             global $search_results,$duplicate_movie_names,$unique_movie_names;
             global $name,$url;
@@ -104,15 +119,6 @@ class Search extends Watch {
         
             $search_results['year_search_required'] = true;
         }
-        
-        // print_r($search_results);
-        // usort($search_results['movies'], function ($a, $b) use ($query) {
-        //     return $this->sort_by_similar($a,$b,$query);
-        // });
-
-        // usort($search_results['series'], function ($a, $b) use ($query) {
-        //     return $this->sort_by_similar($a,$b,$query);
-        // });
 
         return $search_results;
     }
@@ -161,16 +167,18 @@ class Search extends Watch {
         $response = $this->request($this->config->data_parent_page->url . $this->config->data_parent_page->search .$query);
         $content = $this->parse_html($response);
         
-        $node = $content->filter('.video-block')->eq(0);
-        $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
+        try {
+            $node = $content->filter('.video-block')->eq(0);
+            $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
+        } catch(Exception $e) {
+            $this->logger->error('Not Found In Parent');
+            return [];
+        }
+
 
         $this->logger->debug('Parent URL: '. $url);
 
-
-        $response = $this->request($url);
-        $content = $this->parse_html($response);
-
-        $vidcloud_page = preg_replace('/^\/\//',"https://",$content->filter('iframe[src]')->eq(0)->attr('src'));
+        $vidcloud_page = $this->iframe_source($url);
 
         $this->logger->debug('Parent Iframe URL: '. $vidcloud_page);
 
@@ -215,6 +223,34 @@ class Search extends Watch {
         }
 
         return $query;
+    }
+
+    public function convert_roman_numerals_to_number($query){
+        $romans = array(
+            'M' => 1000,
+            'CM' => 900,
+            'D' => 500,
+            'CD' => 400,
+            'C' => 100,
+            'XC' => 90,
+            'L' => 50,
+            'XL' => 40,
+            'X' => 10,
+            'IX' => 9,
+            'V' => 5,
+            'IV' => 4,
+            'I' => 1,
+        );
+        
+        $result = 0;
+        foreach ($romans as $key => $value) {
+            while (strpos($query, $key) === 0) {
+                $result += $value;
+                $query = substr($query, strlen($key));
+            }
+        }
+
+        return $result;
     }
 }
 ?>
