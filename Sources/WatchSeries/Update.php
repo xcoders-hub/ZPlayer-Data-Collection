@@ -78,6 +78,21 @@ class Update extends Shared {
 
     }
 
+    //For each content
+    public function content_set_parent_url(){
+
+        for($content_id =33207;$content_id < 36805;$content_id++){
+
+            $url = $this->config->api->url . $this->config->api->details . "/$content_id";
+
+            $this->logger->debug('Searching For '.$content_id);
+            
+            $this->request($url);
+
+        }
+
+    }
+
 }
 
 ?>

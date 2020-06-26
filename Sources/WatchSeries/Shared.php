@@ -291,7 +291,7 @@ class Shared extends Search {
 
     public function new_series_sources($series_id){
 
-        $path = $this->config->api->details->series . "/$series_id";
+        $path = $this->config->api->details . "/$series_id";
 
         $details = $this->details($path);
 

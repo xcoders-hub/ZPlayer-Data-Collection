@@ -8,7 +8,6 @@ use Symfony\Component\DomCrawler\Crawler;
 
 use Shared\Request;
 use Exception;
-
 use Sources\WatchSeries\Servers\MovCloud;
 use Sources\WatchSeries\Servers\Fembed;
 use Sources\WatchSeries\Servers\Vidcloud;
@@ -30,20 +29,43 @@ class Watch extends Request {
 
 
     //Fetch All Sources For Link
-    public function fetch_sources($url){
-        global $sources,$history,$vidcloud_id_history;
-
-        $response = $this->request($url);
-        $content = $this->parse_html($response);
+    public function fetch_sources($url,$is_vidcloud_url=false){
+        global $sources,$history,$vidcloud_id_history,$vidcloud_url;
 
         $sources = [];
         $history = [];
         $vidcloud_id_history = [];
 
-        $content->filter('a[data-video]')->each(function(Crawler $node, $i){
-            global $sources,$history,$vidcloud_id_history;
+        if(!$is_vidcloud_url){
+            $vidcloud_url = $this->iframe_source($url);
+        } else {
+            preg_match('/vidcloud/i',$url,$matches);
+            if(!$matches){
+                throw new Exception('Invalid Vicloud URL Found');
+            } else {
+                $vidcloud_url = $url;
+            }
+            
+        }
+        
+        $response = $this->request($vidcloud_url);
+        $content = $this->parse_html($response);
+
+        $parent_source = new Data();
+        $parent_source->quality = '';
+        $parent_source->url = preg_replace('/&title.+/','',$vidcloud_url);
+        $parent_source->server_name = 'Content Page';
+
+        $sources[] = $parent_source;
+
+        $content->filter('ul li.linkserver')->each(function(Crawler $node, $i){
+            global $sources,$history,$vidcloud_id_history,$vidcloud_url;
 
             $url = $node->attr('data-video');
+            if(!is_nan($url)){
+                $url = $vidcloud_url;
+            }
+
             $url = preg_replace('/^\/\//',"https://",$url);
             preg_match('/^https:\/\/(?:www.)?(\w+)/',$url,$matches);
             
@@ -65,9 +87,7 @@ class Watch extends Request {
 
                     if($matches){
                         $vidcloud_id = $matches[1];
-                        
-                        $vidcloud_page = $url;
-                        
+                
                         if(!key_exists($vidcloud_id,$vidcloud_id_history)){
                             $vidcloud_id_history[$vidcloud_id] = 1;
                         } else {
@@ -101,15 +121,6 @@ class Watch extends Request {
 
                     if($video_sources && count($video_sources) > 0){
                         $sources = array_merge($sources,$video_sources);
-                    }
-                    
-                    if(isset($vidcloud_page)){
-                        $source = new Data();
-                        $source->quality = '';
-                        $source->url = $vidcloud_page;
-                        $source->server_name = 'Content Page';
-
-                        array_unshift($sources,$source);
                     }
 
                 }
@@ -148,6 +159,10 @@ class Watch extends Request {
 
         global $episodes;
 
+        if(!$url){
+            throw new Exception('No Series URL Given');
+        }
+        
         $season_url = $url . '/season';
         $response = $this->request($season_url);
         $content = $this->parse_html($response);
@@ -169,6 +184,15 @@ class Watch extends Request {
         // die( print_r( $this->fetch_sources('https://www6.watchmovie.movie/series/stargirl-season-1-2020-episode-2') ) );
 
         return $episodes;
+    }
+    
+    public function iframe_source($url){
+        $response = $this->request($url);
+        $content = $this->parse_html($response);
+        $this->logger->debug('Finding Iframe URL: '.$url);
+        $iframe_url = preg_replace('/^\/\//',"https://",$content->filter('iframe[src]')->eq(0)->attr('src'));
+        $iframe_url = preg_replace('/&title.+/','',$iframe_url);
+        return $iframe_url;
     }
     
     public function fetch_episode($node){
