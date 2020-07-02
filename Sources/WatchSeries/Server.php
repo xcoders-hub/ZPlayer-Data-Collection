@@ -4,7 +4,6 @@ namespace Sources\WatchSeries;
 
 use Data\Data;
 use Exception;
-use Shared\API;
 use Sources\WatchSeries\Search;
 use Sources\WatchSeries\Shared;
 use Symfony\Component\DomCrawler\Crawler;
@@ -12,11 +11,6 @@ use Symfony\Component\DomCrawler\Crawler;
 class Server extends Shared {
     
     public function sources($request_json){
-
-        $this->logger->debug('Waiting For Data ....');
-
-        $default_wait = $this->config->retry->request->wait;
-        $default_times = $this->config->retry->request->times;
         
         $response = (object)json_decode($request_json);
 
