@@ -17,8 +17,6 @@ use Sources\WatchSeries\Servers\Vidcloud;
 
 class Watch extends Request {
 
-    public $domain = "https://watchmovie.movie";
-
     public $config,$logger;
 
     function __construct($config,$logger)
@@ -62,7 +60,8 @@ class Watch extends Request {
             global $sources,$history,$vidcloud_id_history,$vidcloud_url;
 
             $url = $node->attr('data-video');
-            if(!is_nan($url)){
+            
+            if(!$url || $url == '' || is_numeric($url)){
                 $url = $vidcloud_url;
             }
 
@@ -72,11 +71,13 @@ class Watch extends Request {
             if(key_exists($url,$history)){
                return;
             }
-
+            
             $history[$url] = 1;
 
             if($matches && $matches != 'hydrax'){
                 $name = strtolower($matches[1]);
+                
+                $this->logger->debug('Source Type: '.$name);
 
                 if($name == 'movcloud'){
                     $storage = new MovCloud($this->config,$this->logger);
