@@ -116,26 +116,30 @@ class Recent extends Information {
 
         $this->logger->debug('Content Date Text Parsed: '.$date);
 
-        preg_match('/(\d+) hour/',$date,$hour_matches);
-        preg_match('/(\d+) minute/',$date,$minute_matches);
-        preg_match('/(\d+) day/',$date,$day_matches);
+        preg_match('/(\d+) hour/i',$date,$hour_matches);
+        preg_match('/(\d+) minute/i',$date,$minute_matches);
+        preg_match('/(\d+) day/i',$date,$day_matches);
+        preg_match('/Just now/i',$date,$now_matches);
 
         $current_date = new DateTime();
-
-        if($hour_matches || $day_matches || $minute_matches){
+        
+        if($hour_matches || $day_matches || $minute_matches || $now_matches){
 
             $this->logger->debug('Content Date Found: '.$date);
+            
+            if(!$now_matches){
 
-            if($minute_matches){
-                $minutes_ago = $minute_matches[1];
-                $current_date->modify("-$minutes_ago minute");
-            }
-            elseif($hour_matches){
-                $hours_ago = $hour_matches[1];
-                $current_date->modify("-$hours_ago hour");
-            } elseif($day_matches){
-                $days_ago = $day_matches[1];
-                $current_date->modify("-$days_ago day");
+                if($minute_matches){
+                    $minutes_ago = $minute_matches[1];
+                    $current_date->modify("-$minutes_ago minute");
+                } elseif($hour_matches){
+                    $hours_ago = $hour_matches[1];
+                    $current_date->modify("-$hours_ago hour");
+                } elseif($day_matches){
+                    $days_ago = $day_matches[1];
+                    $current_date->modify("-$days_ago day");
+                }
+
             }
 
             $content->date_difference = $date;
