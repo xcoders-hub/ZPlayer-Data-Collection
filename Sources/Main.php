@@ -2,9 +2,6 @@
 
 namespace Sources;
 
-use Sources\WatchSeries\Main;
-use Sources\WatchSeries\Server;
-
 require_once __DIR__.'/../vendor/autoload.php';
 require_once __DIR__.'/../Shared/Logger.php';
 require_once __DIR__.'/../Config/Config.php';
@@ -31,9 +28,6 @@ if(count($argv) < 3){
     } else {
         die('Source Location Required');
     }
-
-
-
 }
 
 ?>
