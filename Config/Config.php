@@ -51,6 +51,15 @@
         'series' => '/watch-series',
         'movies' => '/letters',
 
+        'sources' => [
+            'vidcloud' => [
+                'ajax' => 'https://vidcloud9.com/ajax.php?',
+                'download' => 'https://vidcloud9.com/download?'
+            ],
+
+            'movcloud' => 'https://api.movcloud.net/stream/',
+            'fembed'   => 'https://feurl.com/api/source/'
+        ]
     ],
 
     'data_parent_page' => [
