@@ -10,14 +10,9 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class Server extends Shared {
     
-    public function sources($request_json){
-        
-        $response = (object)json_decode($request_json);
+    public function sources($request){
 
-        $this->logger->debug('------- Incoming Request --------');
-        $data = $response->data;
-
-        $this->logger->debug('Response: '.$request_json);
+        $data = $request->data;
 
         $this->config->retry->request->wait = 1;
         $this->config->retry->request->times = 2;
