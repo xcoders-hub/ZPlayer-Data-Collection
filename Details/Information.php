@@ -253,13 +253,13 @@ class Information extends IMDB {
 
     public function send_details($details,$content_type){
 
-        file_put_contents(__DIR__.'/../Downloads/Details/Details_Request.json',json_encode($details));
+        // file_put_contents(__DIR__.'/../Downloads/Details/Details_Request.json',json_encode($details));
 
         $url = $this->api->url . $this->api->new->$content_type;
         $api_response = $this->request($url,'POST',['x-requested-with' => 'XMLHttpRequest'],['data' => $details]);
-        $response = $this->parse_json($api_response);
+        $response = (object)$this->parse_json($api_response);
 
-        file_put_contents(__DIR__.'/../Downloads/Details/Details_Response.json',json_encode($api_response));
+        // file_put_contents(__DIR__.'/../Downloads/Details/Details_Response.json',json_encode($api_response));
 
         if(property_exists($response,'errors')){
             return $this->shared_api->errors($response->errors);
@@ -338,8 +338,6 @@ class Information extends IMDB {
 
         while(true){
 
-            $old_contents = $history->old('series');
-
             if(!$old_contents){
                 $this->logger->debug("No Content To Update");
                 break;
@@ -355,7 +353,7 @@ class Information extends IMDB {
                 $series_details = new Data();
                 $series_details->url = $content->url;
                 $series_details->imdb_url = $show_url;
-                $series_details->old_name = htmlspecialchars($name);
+                $series_details->old_name = $name;
                 $series_details->content_type = $content->content_type;
                 $series_details->show_id = $this->url_id($show_url);
         
