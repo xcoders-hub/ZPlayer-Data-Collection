@@ -125,7 +125,7 @@ class Shared extends Search {
 
                 $this->logger->debug("Saving List");
 
-                file_put_contents(__DIR__.'/../../Downloads/Sources/Episode-List.json',$encoded_data);
+                // file_put_contents(__DIR__.'/../../Downloads/Sources/Episode-List.json',$encoded_data);
 
                 if(!$video_episodes){
                     $this->logger->debug("No Sources Found. New Show Possibly.");
@@ -166,7 +166,7 @@ class Shared extends Search {
 
                 $this->logger->debug("Saving List");
                 
-                file_put_contents(__DIR__.'/../../Downloads/Sources/Movie-List.json',$encoded_data);
+                // file_put_contents(__DIR__.'/../../Downloads/Sources/Movie-List.json',$encoded_data);
 
                 if(!$movie){
                     $this->logger->debug("No Sources Found. New Movie Possibly.");
