@@ -13,7 +13,8 @@ class Fembed extends Request {
     function __construct($config,$logger){
         $this->logger = $logger;
         $this->config = $config;
-        $this->endpoint = 'https://feurl.com/api/source/';
+
+        $this->endpoint = $config->data_page->sources->fembed;
     }
 
     public function video_locations($id){

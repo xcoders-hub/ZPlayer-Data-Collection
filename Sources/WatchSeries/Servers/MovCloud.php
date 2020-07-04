@@ -13,7 +13,8 @@ class MovCloud extends Request {
     function __construct($config,$logger){
         $this->logger = $logger;
         $this->config = $config;
-        $this->endpoint = 'https://api.movcloud.net/stream/';
+
+        $this->endpoint = $config->data_page->sources->movcloud;
     }
 
     public function video_locations($id){

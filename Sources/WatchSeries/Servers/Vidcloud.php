@@ -15,8 +15,9 @@ class Vidcloud extends Request {
     function __construct($config,$logger){
         $this->logger = $logger;
         $this->config = $config;
-        $this->endpoint = 'https://vidcloud9.com/ajax.php?';
-        $this->download_endpoint = 'https://vidcloud9.com/download?';
+
+        $this->endpoint = $config->data_page->sources->vidcloud->ajax;
+        $this->download_endpoint = $config->data_page->sources->vidcloud->download;
     }
 
     public function video_locations($id){
