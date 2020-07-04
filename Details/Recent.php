@@ -68,7 +68,7 @@ class Recent extends Information {
                     if($content_type == 'series'){
 
                         if(property_exists($response_data,'update_required') && $response_data->update_required){
-                            $this->logger->notice('Update Series Required. Last Update Was '.$response_data->time_difference.' Days Ago');
+                            $this->logger->notice('Update Series Required. Last Time Content Updated Was'.$response_data->time_difference.' Days Ago');
 
                             $this->logger->notice("---------------  Updating $upper_content_type Start: $title ---------------");
 
