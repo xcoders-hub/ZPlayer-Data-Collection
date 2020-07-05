@@ -18,7 +18,7 @@ class Config {
 
     //Fetches details from config file
     public function load_config($key){
-        $config_location = __DIR__.'/../Config/config.txt';
+        $config_location = __DIR__.'/../Config/config.conf';
 
         try {
             $config_json = Crypto::decryptWithPassword( file_get_contents($config_location),$key);
