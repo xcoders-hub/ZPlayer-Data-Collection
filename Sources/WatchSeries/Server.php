@@ -23,11 +23,15 @@ class Server extends Shared {
         
         $content_data = $data->content_data;
         
+        $content_type = $data->content_type;
+
         $name = $this->clean_content_name($content_data->name);
         $name = preg_replace('/ and | & |:.+?\-|\?|\!/',' ',$name);
 
         $this->logger->debug("----------- $name Search Start -----------");
 
+        $this->logger->debug("----------- Content Type: $content_type -----------");
+        
         if(property_exists($content_data,'url') && !is_null($content_data->url)){
             $this->logger->notice('Quick Route Taken. Vidcloud URL Found');
             $sources = $this->fetch_sources($content_data->url,true);
@@ -132,9 +136,9 @@ class Server extends Shared {
     
             } else {
                 // $this->logger->debug("----------- $name Search Start -----------");
-    
+
                 $results = $search->search_results($name);
-    
+
                 if($results && key_exists('movies',$results) && count($results['movies']) > 0){
                     
                     $movie = $this->parse_results($results,'movies',$content_data->released ?? false);

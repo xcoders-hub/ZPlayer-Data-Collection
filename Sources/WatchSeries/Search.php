@@ -77,7 +77,7 @@ class Search extends Watch {
 
         }
 
-        $content->filter('li.video-block')->each(function(Crawler $node, $i){
+        $content->filter('li.video-block')->each(function(Crawler $node, $i) use ($query){
             global $search_results,$duplicate_movie_names,$unique_movie_names;
             global $name,$url;
 
@@ -97,8 +97,8 @@ class Search extends Watch {
             if($matches){
                 $search_results['series'][] = ['name' => $name,'url' => $url];
             } else {
-                if (key_exists($name,$unique_movie_names)){
-                    $duplicate_movie_names[] = $name;
+                if ( key_exists($name,$unique_movie_names) ){
+                    $duplicate_movie_names[] = $name;               
                 } else {
                     $unique_movie_names[$name] = 1;
                 }
@@ -109,12 +109,30 @@ class Search extends Watch {
         });
 
         if(count($duplicate_movie_names) > 0){
+
+            $this->logger->debug('Duplicates Found');
+
             foreach($duplicate_movie_names as $duplicate_name){
-                foreach($search_results['movies'] as $index => $movie){
-                    if($movie['name'] == $duplicate_name){
-                        $search_results['movies'][$index]['year'] = $this->information->get_released_year($movie['url']);
+
+                preg_match("/\w$query/",$duplicate_name,$matches);
+
+                if(!$matches){
+
+                    $this->logger->debug('Duplicate: '.$duplicate_name);
+
+                    foreach($search_results['movies'] as $index => $movie){
+                        if($movie['name'] == $duplicate_name){
+                            try {
+                                $search_results['movies'][$index]['year'] = $this->information->get_released_year($movie['url']);
+                            } catch(Exception $e) {
+    
+                            }
+                           
+                        }
                     }
+
                 }
+
             }
         
             $search_results['year_search_required'] = true;
