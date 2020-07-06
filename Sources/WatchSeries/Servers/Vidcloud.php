@@ -52,33 +52,33 @@ class Vidcloud extends Request {
             
         }
 
-        $url = $this->download_endpoint . $id;
+        // $url = $this->download_endpoint . $id;
 
-        $response = $this->request($url,'GET',array('x-requested-with' => 'XMLHttpRequest'));
-        $content = $this->parse_html($response);
+        // $response = $this->request($url,'GET',array('x-requested-with' => 'XMLHttpRequest'));
+        // $content = $this->parse_html($response);
         
-        $content->filter('.mirror_link .dowload a')->each(function(Crawler $node, $i){
-            global $vid_sources;
+        // $content->filter('.mirror_link .dowload a')->each(function(Crawler $node, $i){
+        //     global $vid_sources;
 
-            $quality = preg_replace('/Download| \(|\)| - mp4/i','',$node->text());
-            $link = $node->attr('href');
+        //     $quality = preg_replace('/Download| \(|\)| - mp4/i','',$node->text());
+        //     $link = $node->attr('href');
 
-            preg_match('/ads|Xstreamcdn/i',$quality,$matches);
+        //     preg_match('/ads|Xstreamcdn/i',$quality,$matches);
 
-            if(!$matches){
+        //     if(!$matches){
 
-                $this->logger->debug('Found: '.$quality);
+        //         $this->logger->debug('Found: '.$quality);
 
-                $source = new Data();
-                $source->quality = trim($quality);
-                $source->url = str_replace(' ','%20',$link);
-                $source->server_name = 'VidCloud';
+        //         $source = new Data();
+        //         $source->quality = trim($quality);
+        //         $source->url = str_replace(' ','%20',$link);
+        //         $source->server_name = 'VidCloud';
     
-                $vid_sources[] = $source;
+        //         $vid_sources[] = $source;
 
-            }
+        //     }
 
-        });
+        // });
 
         return $vid_sources;
 
