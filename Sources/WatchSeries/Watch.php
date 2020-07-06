@@ -100,7 +100,7 @@ class Watch extends Request {
                     $storage = new Vidcloud($this->config,$this->logger);
                     preg_match('/\.php\?(.+)/',$url,$matches);
                 } elseif($name == 'fembed' || $name == 'gcloud'){
-                    $storage = new Fembed($this->config,$this->logger);
+                    // $storage = new Fembed($this->config,$this->logger);
                     preg_match('/\/v\/([\w\d\_\-\+]+)\#?/',$url,$matches);
                 }
 
