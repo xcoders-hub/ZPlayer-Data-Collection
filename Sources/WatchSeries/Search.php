@@ -94,16 +94,22 @@ class Search extends Watch {
 
             $name = $this->clean_name($name);
             
-            if($matches){
-                $search_results['series'][] = ['name' => $name,'url' => $url];
-            } else {
-                if ( key_exists($name,$unique_movie_names) ){
-                    $duplicate_movie_names[] = $name;               
+            similar_text($name,$this->clean_name($query),$percentage);
+            
+            if($percentage > 50){
+
+                if($matches){
+                    $search_results['series'][] = ['name' => $name, 'url' => $url];
                 } else {
-                    $unique_movie_names[$name] = 1;
+                    if ( key_exists($name,$unique_movie_names) ){
+                        $duplicate_movie_names[] = $name;               
+                    } else {
+                        $unique_movie_names[$name] = 1;
+                    }
+    
+                    $search_results['movies'][] = ['name' => $name,'url' => $url];
                 }
 
-                $search_results['movies'][] = ['name' => $name,'url' => $url];
             }
 
         });
@@ -162,7 +168,7 @@ class Search extends Watch {
     }
 
     private function clean_name($name){
-        $name = preg_replace('/\s*-\s*Season\s*\d|\(\d+\)$/i','',$name);
+        $name = preg_replace('/\s*-\s*Season\s*\d*|\(\d+\)$/i','',$name);
         $name = ucwords($name);
         $name = utf8_encode($name);
         $name = trim($name);
