@@ -72,7 +72,9 @@ class Recent extends Information {
 
                             $this->logger->notice("---------------  Updating $upper_content_type Start: $title ---------------");
 
-                            $details = $this->overview($title,$content_type,$released_year);
+                            $series_released = $response_data->released ?? $released_year;
+
+                            $details = $this->overview($title,$content_type,$series_released);
                             
                             if(!$details || !property_exists($details,'name')){
                                 return;
@@ -90,6 +92,7 @@ class Recent extends Information {
                             sleep(5);
 
                         } else {
+                            $this->logger->notice('Update Required: '. $response_data->update_required ?? '');
                             $this->logger->notice('Update Not Required');
                         }
 
