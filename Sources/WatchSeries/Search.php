@@ -41,7 +41,7 @@ class Search extends Watch {
         return $suggestions_list;
     }
 
-    public function search_results($query){
+    public function search_results($query,$year=false){
         
         $query = str_replace('&','and',$query);
         
@@ -77,7 +77,7 @@ class Search extends Watch {
 
         }
 
-        $content->filter('li.video-block')->each(function(Crawler $node, $i) use ($query){
+        $content->filter('li.video-block')->each(function(Crawler $node, $i) use ($query,$year){
             global $search_results,$duplicate_movie_names,$unique_movie_names;
             global $name,$url;
 
@@ -99,7 +99,20 @@ class Search extends Watch {
             if($percentage > 50){
 
                 if($matches){
-                    $search_results['series'][] = ['name' => $name, 'url' => $url];
+
+                    if($year){
+                        preg_match('/\((\d+)\)/',$name,$year_matches);
+
+                        if($year_matches && $year_matches[1] == $year){
+                            array_unshift($search_results['series'], ['name' => $name, 'url' => $url]);
+                        } else {
+                            $search_results['series'][] = ['name' => $name, 'url' => $url];
+                        }
+                    }
+                    else {
+                        $search_results['series'][] = ['name' => $name, 'url' => $url];
+                    }
+                   
                 } else {
                     if ( key_exists($name,$unique_movie_names) ){
                         $duplicate_movie_names[] = $name;               
