@@ -57,7 +57,7 @@ class Server extends Shared {
                     $this->logger->error('No Season Number Provided');
                 }
                 
-                $results = $search->search_results($search_string);
+                $results = $search->search_results($search_string,$content_data->released ?? false);
     
                 $sources = [];
     
