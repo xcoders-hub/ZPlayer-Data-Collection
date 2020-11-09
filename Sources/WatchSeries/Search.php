@@ -181,11 +181,15 @@ class Search extends Watch {
     }
 
     private function clean_name($name){
-        $name = preg_replace('/\s*-\s*Season\s*\d*|\(\d+\)$/i','',$name);
+        $name = preg_replace('/\W+$|\s*\d+ (:?Hours|Minutes|Day) Ago$|\s+$|\s*(:?HD|SD|\s*\d{4}-\d{2}-\d{2}).+|\s*(episode \d*:*.+)|\(\d+\)$/i','',$name);
         $name = ucwords($name);
-        $name = utf8_encode($name);
+        // $name = utf8_decode($name);
         $name = trim($name);
         return $name;
+    }
+
+    private function name_only($name){
+        return preg_replace('/\s*-*\s*Season\s*\d*|\(\d+\)$/i','',$this->clean_name($name));
     }
 
     private function sort_by_similar($a, $b,$query){
@@ -196,44 +200,6 @@ class Search extends Watch {
         $this->logger->debug($b['name'] .' similar : '.$levB);
 
         return $levA === $levB ? 0 : ($levA > $levB ? 1 : -1);
-    }
-
-
-    public function parent_page_search($query){
-
-        $response = $this->request($this->config->data_parent_page->url . $this->config->data_parent_page->search .$query);
-        $content = $this->parse_html($response);
-        
-        try {
-            $node = $content->filter('.video-block')->eq(0);
-            $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
-        } catch(Exception $e) {
-            $this->logger->error('Not Found In Parent');
-            return [];
-        }
-
-
-        $this->logger->debug('Parent URL: '. $url);
-
-        $vidcloud_page = $this->iframe_source($url);
-
-        $this->logger->debug('Parent Iframe URL: '. $vidcloud_page);
-
-        $this->logger->debug('Finding Parent Page Sources');
-
-        $storage = new Vidcloud($this->config,$this->logger);
-        preg_match('/\.php\?(.+)/',$vidcloud_page,$matches);
-
-        $video_sources = $storage->video_locations($matches[1]);
-
-        $source = new Data();
-        $source->quality = '';
-        $source->url = $vidcloud_page;
-        $source->server_name = 'Content Page';
-        
-        array_unshift($video_sources,$source);
-
-        return $video_sources;
     }
 
     public function convert_word_to_number($query){
@@ -289,5 +255,106 @@ class Search extends Watch {
 
         return $result;
     }
+
+    public function parent_page_search($query){
+
+        $response = $this->request($this->config->data_parent_page->url . $this->config->data_parent_page->search .$query);
+        $content = $this->parse_html($response);
+        
+        try {
+            $node = $content->filter('.video-block')->eq(0);
+            $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
+        } catch(Exception $e) {
+            $this->logger->error('Not Found In Parent');
+            return [];
+        }
+
+
+        $this->logger->debug('Parent URL: '. $url);
+
+        $vidcloud_page = $this->iframe_source($url);
+
+        $this->logger->debug('Parent Iframe URL: '. $vidcloud_page);
+
+        $this->logger->debug('Finding Parent Page Sources');
+
+        $storage = new Vidcloud($this->config,$this->logger);
+        preg_match('/\.php\?(.+)/',$vidcloud_page,$matches);
+
+        $video_sources = $storage->video_locations($matches[1]);
+
+        $source = new Data();
+        $source->quality = '';
+        $source->url = $vidcloud_page;
+        $source->server_name = 'Content Page';
+        
+        array_unshift($video_sources,$source);
+
+        return $video_sources;
+    }
+
+    public function vidcloud_search($query){
+        $response = $this->request($this->config->data_parent_page->url . $this->config->data_parent_page->search .$query);
+        $content = $this->parse_html($response);
+        
+        $this->logger->debug('Query: '. $query);
+
+        global $search_results;
+
+        $search_results = array('series' => [],'movies' => []);
+
+        $content_name = $this->name_only($query);
+
+        $this->logger->debug('Finding '. $content_name);
+
+        preg_match('/season (\d+)$/i',$query,$season_number_matches);
+        $selected_season_number = $season_number_matches[1] ?? null;
+
+        $content->filter('.video-block')->each(function(Crawler $node) use ($query,$content_name,$selected_season_number){
+            global $search_results;
+
+            $name =  $this->clean_name($node->filter('a')->eq(0)->text());
+            $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
+
+            preg_match('/season/i',$name,$season_matches);
+
+            $this->logger->debug('Name: ' . $name);
+
+            similar_text( $this->name_only($name),$content_name,$percentage);
+            
+            if($percentage > 50){
+
+                if($season_matches){
+
+                    preg_match("/^$content_name -* season $selected_season_number\b/i",$name,$correct_season_matches);
+
+                    $this->logger->debug("/^$content_name -* season $selected_season_number\b/i");
+
+                    if($correct_season_matches){
+                        $this->logger->debug('Correct Season Found: '. $name);
+                        $search_results['series'][] = ['name' => $name, 'url' => $url];
+                    }
+                } else {
+                    // $this->logger->debug('Movie: ' . $name);
+
+                    preg_match("/^$content_name$\b/i",$name,$correct_movie_matches);
+
+                    if($correct_movie_matches){
+                        $this->logger->debug('Movie Match Found: ' . $name);
+                        $search_results['movies'][] = ['name' => $name, 'url' => $url];
+                    }
+                   
+                }
+
+            }
+
+           
+        });
+
+
+        return $search_results;
+
+    }
+
 }
 ?>

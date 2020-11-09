@@ -26,7 +26,8 @@ class Server extends Shared {
         $content_type = $data->content_type;
 
         $name = $this->clean_content_name($content_data->name);
-        $name = preg_replace('/ and | & |:.+?\-|\?|\!/',' ',$name);
+        $name = preg_replace('/:.+?\-|\?|\!/',' ',$name);
+        $name = str_replace("'",'',$name);
 
         $this->logger->debug("----------- $name Search Start -----------");
 
@@ -57,78 +58,38 @@ class Server extends Shared {
                     $this->logger->error('No Season Number Provided');
                 }
                 
-                $results = $search->search_results($search_string,$content_data->released ?? false);
+                $results = $search->vidcloud_search($search_string);
     
                 $sources = [];
     
                 if($results && key_exists('series',$results)){
                     
-                    $season_url = null;
+                    if($results && key_exists('series',$results) && count($results['series']) > 0){
+                        $sources = $this->vidcloud_episode($results['series'][0]['url'], $episode_number);    
+                    }
+                    // $season_url = null;
                     
-                    if(count( $results['series']) > 0){
-                        $season_url = $results['series'][0]['url'] . '/season';
-                    } else {
-                        //Some shows are not marked with season on page. Just a desperate attempt
-                        if($season_number == 1){
-                            $results = $search->search_results($name);
-                            if(count($results['movies']) > 0){
-                                $site_url =  $results['movies'][0]['url'];
-                                preg_match('/series/i',$site_url,$matches);
+                    // if(count( $results['series']) > 0){
+                    //     $season_url = $results['series'][0]['url'] . '/season';
+                    // } else {
+                    //     //Some shows are not marked with season on page. Just a desperate attempt
+                    //     if($season_number == 1){
+                    //         $results = $search->search_results($name);
+                    //         if(count($results['movies']) > 0){
+                    //             $site_url =  $results['movies'][0]['url'];
+                    //             preg_match('/series/i',$site_url,$matches);
 
-                                if($matches){
-                                    $season_url = $site_url . '/season';
-                                } else {
-                                    $season_url = preg_replace('/-info/i','',$site_url) . '/all';
-                                }
+                    //             if($matches){
+                    //                 $season_url = $site_url . '/season';
+                    //             } else {
+                    //                 $season_url = preg_replace('/-info/i','',$site_url) . '/all';
+                    //             }
                                 
-                            }
+                    //         }
                             
-                        }
+                    //     }
     
-                    }
-                    
-                    if($season_url){
-    
-                        $response = $this->request($season_url);
-                        $content = $this->parse_html($response);
-                        
-                        $this->logger->debug('Fetching Episode Link');
-                        $this->logger->debug("Searching For Episode $episode_number");
-        
-                        try {
-        
-                            $content->filter('.vid_info a')->each(function(Crawler $node, $i) use($episode_number){
-                                global $sources;
-        
-                                $name = $node->text();
-        
-                                $this->logger->debug("Episode $episode_number =~ $name");
-        
-                                preg_match("/Episode $episode_number(?!\d)/i",$name,$matches);
-                                
-                                if($matches){
-                                    $this->logger->debug("Found $name");
-                                    
-                                    try {
-                                        $episode = $this->fetch_episode($node);
-                                        $sources = $episode->sources;
-        
-                                    } catch(Exception $e) {
-                                        $this->logger->error('No Episode Found');
-                                    }
-        
-                                    throw new Exception('Found Episode. Returning Sources');
-                                    
-                                }
-        
-                            });
-                            
-                        } catch(Exception $e){
-                            $this->logger->debug('Complete');
-                        }
-    
-                    }
-    
+                    // }
     
                 } else {
                     $this->logger->error('No Results Found');
@@ -137,20 +98,10 @@ class Server extends Shared {
             } else {
                 // $this->logger->debug("----------- $name Search Start -----------");
 
-                $results = $search->search_results($name);
+                $results = $search->vidcloud_search($name);
 
                 if($results && key_exists('movies',$results) && count($results['movies']) > 0){
-                    
-                    $movie = $this->parse_results($results,'movies',$content_data->released ?? false);
-    
-                    if($movie && property_exists($movie,'sources')){
-                        $sources = $movie->sources;
-                    }
-    
-                } else {
-                    //If not found on child page, check straight in parent page
-                    $search = new Search($this->config,$this->logger);
-                    $sources = $search->parent_page_search($name);
+                    $sources = $this->vidcloud_movie($results['movies'][0]['url']);    
                 }
     
                 // $this->logger->debug("----------- $name Search Complete -----------");
@@ -162,7 +113,7 @@ class Server extends Shared {
         $this->logger->debug("----------- $name Search Complete -----------");
 
         $response = new Data();
-        $response->sources = $sources;
+        $response->sources = $sources ?? [];
 
         $response_json = json_encode( ['data' => $response ]);
 

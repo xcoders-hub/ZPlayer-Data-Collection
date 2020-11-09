@@ -101,7 +101,7 @@ class Watch extends Request {
                     preg_match('/\.php\?(.+)/',$url,$matches);
                 } elseif($name == 'fembed' || $name == 'gcloud'){
                     // $storage = new Fembed($this->config,$this->logger);
-                    preg_match('/\/v\/([\w\d\_\-\+]+)\#?/',$url,$matches);
+                    // preg_match('/\/v\/([\w\d\_\-\+]+)\#?/',$url,$matches);
                 }
 
                 if(!$matches){
@@ -224,6 +224,51 @@ class Watch extends Request {
         return $episode;
     }
     
+    public function vidcloud_episode($url,$episode_number){
+        $this->logger->debug('Finding Vidcloud Sources For Episode '. $episode_number);
+        
+        if(is_null($episode_number) || is_nan($episode_number) ){
+            throw new Exception('Epsiode Number Must Be A Number: '. $episode_number);
+        }
+
+        $response = $this->request($url);
+        $content = $this->parse_html($response);
+
+        global $episode_video_sources;
+
+        try {
+            $content->filter('.listing.items.lists .video-block')->each(function(Crawler $node) use ($episode_number){
+                global $episode_video_sources;
+
+                $name =  $node->filter('a')->eq(0)->text();
+                $url = $this->config->data_parent_page->url . $node->filter('a')->eq(0)->attr('href');
+    
+                preg_match("/episode 0*$episode_number\b/i",$name,$episode_matches);
+                
+                if($episode_matches){
+                    $this->logger->debug('Episode Found: '. $name);
+                    $episode_source_url = $this->iframe_source($url);
+
+                    $episode_video_sources = $this->fetch_sources($episode_source_url,true);
+            
+                    throw new Exception();
+                }
+               
+            });
+
+        } catch(Exception $e) {
+            $this->logger->debug('Correct Episode Found. Vidcloud Source URL Returned');
+        }
+
+        return $episode_video_sources;
+
+    }
+
+    public function vidcloud_movie($url){
+        $this->logger->debug('Finding Movies Sources');
+        return $this->fetch_sources( $this->iframe_source($url) ,true);
+    }
+
 }
 
 ?>
