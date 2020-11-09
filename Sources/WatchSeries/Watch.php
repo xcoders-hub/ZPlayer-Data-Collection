@@ -11,6 +11,7 @@ use Exception;
 use Sources\WatchSeries\Servers\EasyLoad;
 use Sources\WatchSeries\Servers\MovCloud;
 use Sources\WatchSeries\Servers\Fembed;
+use Sources\WatchSeries\Servers\MixDrop;
 use Sources\WatchSeries\Servers\Vidcloud;
 
 // For a given page, return all links to watch it.
@@ -106,6 +107,9 @@ class Watch extends Request {
                 } elseif($name == 'easyload' || $name == 'streamtape'){
                     $storage = new EasyLoad($this->config,$this->logger);
                     $matches = [1, $url];
+                } elseif($name == 'mixdrop'){
+                    $storage = new MixDrop($this->config,$this->logger);
+                    $matches = [1, $url];
                 }
 
                 if(!$matches){
@@ -123,7 +127,6 @@ class Watch extends Request {
                         $this->logger->error('Source Errors: '. $e->getMessage());    
                     }
                    
-
                     if($video_sources && count($video_sources) > 0){
                         $sources = array_merge($sources,$video_sources);
                     }
