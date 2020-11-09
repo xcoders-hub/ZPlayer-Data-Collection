@@ -34,9 +34,9 @@ class Request extends Validator {
 
             try {
 
-                $response = $client->request($method, $url,$request_data);
-
                 $this->logger->debug("Sending $method Request: $url");
+
+                $response = $client->request($method, $url,$request_data);
 
                 $statusCode = $response->getStatusCode();
                 
