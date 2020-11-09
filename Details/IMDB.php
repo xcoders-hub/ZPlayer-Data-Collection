@@ -283,7 +283,7 @@ class IMDB extends Request {
         }
 
         $series_name = preg_replace('/\(\d{4}\)\s*/','',$series_name);
-        $series_details->name = str_replace('&nbsp;','',preg_replace('/^\s+|\s+$/','',$series_name));
+        $series_details->name = str_replace('&nbsp;','',preg_replace('/^\s+|\s+$|\W+$/','',$series_name));
 
         $genres = implode(', ',(array)$genres);
 
