@@ -8,6 +8,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 use Shared\Request;
 use Exception;
+use Sources\WatchSeries\Servers\EasyLoad;
 use Sources\WatchSeries\Servers\MovCloud;
 use Sources\WatchSeries\Servers\Fembed;
 use Sources\WatchSeries\Servers\Vidcloud;
@@ -102,6 +103,9 @@ class Watch extends Request {
                 } elseif($name == 'fembed' || $name == 'gcloud'){
                     // $storage = new Fembed($this->config,$this->logger);
                     // preg_match('/\/v\/([\w\d\_\-\+]+)\#?/',$url,$matches);
+                } elseif($name == 'easyload' || $name == 'streamtape'){
+                    $storage = new EasyLoad($this->config,$this->logger);
+                    $matches = [1, $url];
                 }
 
                 if(!$matches){
